@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# build output
+/build/
+/external/build/
+/external/sc_code/build/
+/external/Frameworks/
+*.mxo
+*.dSYM
+*.o
+*.wav
+
+# the vendored SuperCollider is a clone with its own history: build it locally
+/vendor/supercollider/
+
+# python
+__pycache__/
+*.pyc

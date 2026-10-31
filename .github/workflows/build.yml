@@ -1,0 +1,95 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Compile-only CI: this tree does not ship the test suite (see README), so the job
+# proves that a clean clone can build both bundles on Apple Silicon and that the
+# results are sane: arm64 slice, ad-hoc signature, and no dynamic dependency outside
+# Apple's system paths, @loader_path and @executable_path.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      SC_TAG: Version-3.14.1
+      SC_COMMIT: 426edf6
+      MAXSDK: ${{ github.workspace }}/max-sdk/source/max-sdk-base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      # The engine compiles the *installed* class library and loads the installed
+      # .scx plugins; it also takes libsndfile from SuperCollider.app/Frameworks.
+      - name: Install SuperCollider 3.14.1 (runtime dependency)
+        run: |
+          set -euo pipefail
+          url=$(curl -sSL "https://api.github.com/repos/supercollider/supercollider/releases/tags/$SC_TAG" |
+            python3 -c 'import json,sys; r=json.load(sys.stdin); print(next(a["browser_download_url"] for a in r["assets"] if a["name"].endswith(".zip") and "macOS" in a["name"]))')
+          echo "asset: $url"
+          curl -sSL "$url" -o "$RUNNER_TEMP/sc.zip"
+          unzip -q "$RUNNER_TEMP/sc.zip" -d "$RUNNER_TEMP/sc"
+          app=$(find "$RUNNER_TEMP/sc" -maxdepth 3 -name 'SuperCollider.app' -type d | head -1)
+          test -n "$app" || { echo "SuperCollider.app not found in the release zip"; find "$RUNNER_TEMP/sc" | head -40; exit 1; }
+          sudo ditto "$app" /Applications/SuperCollider.app
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/SuperCollider.app/Contents/Info.plist
+
+      - name: Cache the SuperCollider static libs
+        id: sc-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/supercollider/build
+          key: sc-statics-${{ runner.arch }}-${{ env.SC_COMMIT }}
+
+      - name: Build the pinned SuperCollider statics
+        if: steps.sc-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --branch "$SC_TAG" --depth 1 --recurse-submodules --shallow-submodules \
+            https://github.com/supercollider/supercollider.git vendor/supercollider
+          git -C vendor/supercollider rev-parse --short HEAD
+          cmake -S vendor/supercollider -B vendor/supercollider/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSC_QT=OFF -DSC_IDE=OFF -DSC_ABLETON_LINK=OFF -DSUPERNOVA=OFF \
+            -DENABLE_TESTSUITE=OFF
+          cmake --build vendor/supercollider/build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Max SDK
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/Cycling74/max-sdk.git max-sdk
+          test -d "$MAXSDK/c74support/max-includes" || { echo "unexpected max-sdk layout"; exit 1; }
+
+      - name: Build sc3~ (bundle + ad-hoc signature + flat-namespace gate)
+        working-directory: external
+        env:
+          SC3_OUTDIR: ${{ github.workspace }}/out
+          MAX_SDK: ${{ github.workspace }}/max-sdk/source/max-sdk-base
+        run: ./build.sh
+
+      - name: Build sc_code
+        working-directory: external/sc_code
+        env:
+          MAX_SDK: ${{ github.workspace }}/max-sdk/source/max-sdk-base
+        run: make bundle
+
+      - name: Verify the bundles
+        run: |
+          set -euo pipefail
+          for bin in out/sc3~.mxo/Contents/MacOS/sc3~ external/sc_code/build/sc_code.mxo/Contents/MacOS/sc_code; do
+            echo "== $bin"
+            file "$bin"
+            file "$bin" | grep -q 'arm64' || { echo "not arm64"; exit 1; }
+            codesign --verify --strict "$(dirname "$(dirname "$bin")")"
+            # dynamic deps: Apple system paths and our own @loader_path only
+            bad=$(otool -L "$bin" | tail -n +2 |
+                  grep -v -E '^[[:space:]]*(/usr/lib/|/System/Library/|@loader_path/|@executable_path/)' || true)
+            if [ -n "$bad" ]; then echo "unexpected dependency:"; echo "$bad"; exit 1; fi
+          done
+          ls -la out external/sc_code/build | head -20
