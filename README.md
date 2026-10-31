@@ -48,11 +48,19 @@ Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 ```
 [sc3~ 2]  ──────────────►  [dac~]
 ```
-* Click the object or send `bang` (or `open`) to boot the engine.
-* Send it code: `eval { SinOsc.ar(440) * 0.2 }.play;` — or patch an `sc_code` editor to
-  the message inlet and press `⌘Return`.
+* Send `open` (or a `bang`) to boot the engine.
+* Send it code: `eval { SinOsc.ar(440) * 0.2 }.play;` — or patch an `sc_code` editor
+  to the message inlet and press `⌘Return`.
+* Whatever the engine prints shows up in **Max's console** on its own — no outlets, no
+  `[print]` needed.
 * `panic` runs `CmdPeriod.run` (nodes + clocks + hooks), `freeall` only frees the nodes;
   `close` shuts the engine down.
+
+> **Warning for SuperCollider users:** do **not** press `⌘.` in Max to kill the sound.
+> In Max that is *stop scheduler*, which halts Max's own scheduler and the whole patch
+> stops responding. Use the `panic` message (or `⌃.` inside `sc_code`), which touches
+> the SC side only. If you already hit it, bring the scheduler back with Max's
+> `Resume`.
 
 ## `sc3~` reference
 
@@ -75,6 +83,13 @@ bus by default.
 * **Outlet 2 — `post`**: the SC console (polls, warnings, `post` output).
 * **Outlets 3 … n+2 — audio**: channel `n-1` … channel `0`.
 
+Outlets 1 and 2 are **optional**. By default the same text is mirrored to **Max's
+console** with the SC IDE's look (raw lines, no object prefix), so a lone `[sc3~]` shows
+its `post` output, warnings and errors with nothing patched. Wire `[print]` to them only
+if you want to route the text yourself, and set `console 0` first so each line is
+printed once instead of twice. `console` is **per instance**: a patch that silences its
+own mirroring never silences the console of another patch.
+
 ### Attributes
 
 | attribute | default | meaning |
@@ -82,12 +97,14 @@ bus by default.
 | `@port N` | `0` | UDP port of the engine's World. `0` = automatic (the kernel picks a free one). Saved with the patch, applied on `open`/`close`. |
 | `@ins N` | `0` | number of audio input signal inlets. Fixed at creation: reload the object to change it. |
 | `@allowscversion 1` | `0` | accept an installed SuperCollider with a different minor version. |
+| `@console 0` | `1` | mirror the engine text to Max's console (same state as the `console` message, but saved with the patch). `0` = outlets only. |
 
 ### Messages
 
 | message | effect |
 |---|---|
-| `bang`, `open` | boot the engine (asynchronous; `info` reports the state) |
+| `open` | boot the engine (asynchronous; `info` reports the state) |
+| `bang` | boot it if it is not up yet (or if the last boot failed), then post the state |
 | `close` | shut the engine down |
 | `info` | post the current state (version, port, sr, channels, nodes) |
 | `eval <code…>` | evaluate an expression (`( … )` for several statements) |
@@ -96,7 +113,7 @@ bus by default.
 | `panic`, `stop` | `CmdPeriod.run`: stops nodes, clocks and hooks (audio keeps running) |
 | `hardstop` | panic and silence the DSP chain |
 | `freeall` | `s.freeAll`: nodes only, clocks and Routines keep running |
-| `console 0\|1` | enable/disable the console forwarding to the outlets |
+| `console 0\|1` | same as `@console` (per instance): `1` = also mirror to Max's console, `0` = outlets only |
 | `debug 0\|1` | enable/disable the eval dump |
 | `port <n>` | same as `@port` |
 
@@ -173,8 +190,9 @@ is left untouched and Max's console lists the keys that are available.
 * **No GUI in the engine.** There is no Qt: `plot`, `Window`, and any code that tries to
   open a window will fail. Use Max for UI, `eval` for logic. `MouseX` / `MouseY` /
   `MouseButton` do work — they read the **screen** mouse, not the patch.
-* **`⌘.` is not caught** by the objects: Max handles it before any external. Use the
-  `panic` message, or `⌃.` in `sc_code`.
+* **`⌘.` is not caught** by the objects, and no external can catch it: Max handles it
+  first, as *stop scheduler*. Out of SC habit it is the easiest way to freeze the whole
+  patch. Use the `panic` message, or `⌃.` in `sc_code`.
 * **One expression per `eval`**: `( … )` for a block, but two sibling `( … )` blocks in one
   call is a parse error.
 * `Buffer:setn` takes pairs: `setn(0, [ … ])`.

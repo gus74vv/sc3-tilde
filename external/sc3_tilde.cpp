@@ -82,6 +82,7 @@ typedef struct _sc3 {
 	int pending_stop;    /* 0 = none, 1 = panic, 2 = hardstop, 3 = freeall */
 	bool opened;         /* open() emitted and engine retained */
 	int boot_seen;       /* last boot state reported (3.1: 0 off/1 booting/2 ready/3 failed) */
+	int console_on;      /* mirror the engine text to Max's console (PER INSTANCE) */
 	/* 3.8: audio input. `ins` = signal inlets (can only be set at creation,
 	   see `@ins`); the object pushes every host block into the World (Sc3Engine.h). */
 	long ins;
@@ -107,11 +108,31 @@ static void sc3_pump_stop(t_sc3 *x);
    whether the Max container (message box, textedit…) altered the text. */
 static int gDebugEval = 0;
 
-/* Mirrors the text to the Max console (`object_post`/`object_error`). Default
-   1: a patch with nothing connected still shows what happens. Patches that
-   connect [print post]/[print error] send `console 0`, so each line comes out
-   ONCE (otherwise it shows up twice: console + print of the outlet). */
-static int gConsole = 1;
+/* Mirroring the engine text to the Max console is PER INSTANCE (`console 1`,
+   the default): a patch with nothing connected still shows what happens.
+   Patches that connect [print post]/[print error] send `console 0`, so each
+   line comes out ONCE (otherwise it shows up twice: console + print).
+
+   BUG #20: this used to be ONE global. Opening a second patch that sends
+   `console 0` — the `sc3~` help, the test patches, any patch wiring `[print]` —
+   silently muted the console for EVERY instance, so the patch that was already
+   running just "stopped posting" (and nothing said why). The Max console is one
+   window shared by the process, so the decision is still all-or-nothing, but it
+   is now taken by the instances: mirror while AT LEAST ONE open instance wants
+   it (`console 0` only means "this patch reads the text from the outlets"). */
+static int gConsoleInstances = 0; /* instances with console_on == 1 */
+
+/* The ONE place where the flag changes: keeps the counter in sync. Used by the
+   `console 0|1` message and by the `@console` attribute (same state, so a patch
+   can put it in the object box and Max saves it with the patcher). */
+static void sc3_set_console(t_sc3 *x, int on)
+{
+	const int want = on ? 1 : 0;
+	if (want == x->console_on)
+		return;
+	gConsoleInstances += want ? 1 : -1;
+	x->console_on = want;
+}
 static void sc3_debug_dump(long argc, t_atom *argv, const std::string &code)
 {
 	if (!gDebugEval)
@@ -198,7 +219,7 @@ static void sc3_post(t_sc3 *x, const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	if (gConsole)
+	if (x->console_on) /* per instance: a patch with [print] says it itself */
 		object_post((t_object *)x, "%s", buf);
 	sc3_emit(x, x->out_post, "post", buf);
 }
@@ -356,9 +377,11 @@ static void sc3_report_status(t_sc3 *x)
 	         SC3_TILDE_VERSION, stateName, st.sampleRate, st.bufLength,
 	         x->maxvec, st.numUnits, st.degraded ? "yes" : "no",
 	         st.scVersion.empty() ? "?" : st.scVersion.c_str());
-	sc3_post(x, "  sr=%s dsp=%s pumped=%ld blocks (cumulative, DSP off only) lag=%ld",
+	sc3_post(x, "  sr=%s dsp=%s pumped=%ld blocks (cumulative, DSP off only) lag=%ld "
+	            "console=%s",
 	         st.sampleRateFromHost ? "project (DSP chain)" : "s.options",
-	         dspOn ? "on" : "off", eng.pumpedBlocks(), eng.pumpLagBlocks());
+	         dspOn ? "on" : "off", eng.pumpedBlocks(), eng.pumpLagBlocks(),
+	         x->console_on ? "on" : "off");
 	sc3_post(x, "  s.options: maxNodes=%ld memSize=%ldKB buses=%ld blockSize=%ld maxLogins=%ld",
 	         st.maxNodes, st.memSizeKB, st.numAudioBusChannels, st.blockSize, st.maxLogins);
 	/* 4.x: World port. With 0 (default) the kernel picks it: that is what makes
@@ -460,6 +483,11 @@ static void sc3_close(t_sc3 *x)
 
 static void sc3_bang(t_sc3 *x)
 {
+	/* Max idiom: a loadbang/button on the inlet should wake the engine up.
+	   `bang` boots only when nothing is up yet (open() is idempotent and also
+	   retries a failed boot); then, like `info`, it posts the state. */
+	if (!x->opened || Sc3Engine::instance().status().failed)
+		sc3_open(x);
 	sc3_report_status(x);
 }
 
@@ -468,13 +496,33 @@ static void sc3_info(t_sc3 *x)
 	sc3_report_status(x);
 }
 
-/* `console 0` / `console 1`: whether the engine text is mirrored to the Max
-   console in addition to going out the outlets. 0 when the patch already wires [print]. */
+/* Setter of the `@console` attribute (see ext_main). Same state as the message. */
+static t_max_err sc3_console_set(t_sc3 *x, t_object *attr, long argc, t_atom *argv)
+{
+	(void)attr;
+	long n = 1;
+	if (argc > 0 && argv) {
+		const int t = atom_gettype(argv);
+		if (t == A_LONG)
+			n = atom_getlong(argv);
+		else if (t == A_FLOAT)
+			n = (long)atom_getfloat(argv);
+	}
+	sc3_set_console(x, n != 0);
+	return MAX_ERR_NONE;
+}
+
+/* `console 0` / `console 1`: whether THIS instance's engine text is mirrored to
+   the Max console in addition to going out the outlets. 0 when the patch already
+   wires [print post]/[print error]. It never touches the other patches: they
+   keep their own flag (bug #20, see gConsoleInstances). */
 static void sc3_console(t_sc3 *x, long on)
 {
-	gConsole = on ? 1 : 0;
-	object_post((t_object *)x, "console = %s", gConsole ? "ON (consola + outlets)"
-	                                                    : "OFF (solo outlets)");
+	sc3_set_console(x, on != 0);
+	object_post((t_object *)x, "console = %s%s",
+	            x->console_on ? "ON (console + outlets)" : "OFF (outlets only)",
+	            gConsoleInstances > 0 ? ""
+	                                  : " — no instance mirrors to the console now");
 }
 
 /* `debug 1` / `debug 0`: dumps every `eval` to /tmp/sc3_eval_last.scd. */
@@ -677,13 +725,13 @@ static void sc3_request_stop(t_sc3 *x, int kind)
 static void sc3_panic(t_sc3 *x)
 {
 	sc3_request_stop(x, 1);
-	sc3_post(x, "panic: CmdPeriod.run (nodos + clocks + hooks)");
+	sc3_post(x, "panic: CmdPeriod.run (nodes + clocks + hooks)");
 }
 
 static void sc3_hardstop(t_sc3 *x)
 {
 	sc3_request_stop(x, 2);
-	sc3_post(x, "hardstop: CmdPeriod.hardRun (incluye TempoClock.default)");
+	sc3_post(x, "hardstop: CmdPeriod.hardRun (includes TempoClock.default)");
 }
 
 static void sc3_freeall(t_sc3 *x)
@@ -774,13 +822,13 @@ static void sc3_flush(t_sc3 *x)
 	if (x->opened) {
 		std::string p = Sc3Engine::instance().takePost(64 * 1024);
 		if (!p.empty()) {
-			if (gConsole)
+			if (x->console_on)
 				sc3_console_mirror(p, false);
 			sc3_emit(x, x->out_post, "post", p.c_str());
 		}
 		std::string e = Sc3Engine::instance().takeError(64 * 1024);
 		if (!e.empty()) {
-			if (gConsole)
+			if (x->console_on)
 				sc3_console_mirror(e, true);
 			sc3_emit(x, x->out_err, "error", e.c_str());
 		}
@@ -1130,6 +1178,12 @@ static void *sc3_new(t_symbol *s, long argc, t_atom *argv)
 	x->created = 0;
 	x->input_claimed = 0;
 	x->input_warned = 0;
+	/* 4.5: DEFAULT ON — a patch can just wire [print post]/[print error] and send
+	   `console 0`, or put `@console 0` in the object box (see the attribute).
+	   It is set BEFORE attr_args_process: the attribute setter only counts the
+	   change, it does not initialize. */
+	x->console_on = 1;
+	gConsoleInstances++;
 	for (long i = 0; i < 16; ++i)
 		x->input_conn[i] = -1; /* -1 = dsp64 has not run yet */
 	/* 3.8: `ins_created` = value from the scan; the attribute applies the same (below). */
@@ -1233,6 +1287,10 @@ static void sc3_free(t_sc3 *x)
 		Sc3Engine::instance().release();
 		x->opened = false;
 	}
+	if (x->console_on) { /* bug #20: the counter must not drift when a patch closes */
+		gConsoleInstances--;
+		x->console_on = 0;
+	}
 	dsp_free((t_pxobject *)x);
 }
 
@@ -1272,6 +1330,16 @@ extern "C" void C74_EXPORT ext_main(void *r)
 	class_addattr(c, attr_offset_new("allowscversion", USESYM(long), 0, (method)0L,
 	                                 (method)0L,
 	                                 calcoffset(t_sc3, allowscversion)));
+
+	/* 4.5: `@console 0` = read the engine text from the outlets only (a patch
+	   that wires [print post]/[print error]); no mirroring to Max's console, so
+	   every line comes out ONCE. Default 1 (like the SC IDE's post window). It is
+	   the same state as the `console 0|1` message — but the attribute is SAVED
+	   with the patch, so no loadbang is needed. Per instance: it never mutes
+	   another patch (bug #20). */
+	class_addattr(c, attr_offset_new("console", USESYM(long), 0, (method)0L,
+	                                 (method)sc3_console_set,
+	                                 calcoffset(t_sc3, console_on)));
 
 	class_addmethod(c, (method)sc3_bang, "bang", 0);
 	class_addmethod(c, (method)sc3_info, "info", 0);
