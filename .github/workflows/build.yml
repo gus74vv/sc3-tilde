@@ -14,7 +14,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    # macos-15 (arm64): macos-14 images are being retired (brownouts cancel the job).
+    runs-on: macos-15
     env:
       SC_TAG: Version-3.14.1
       SC_COMMIT: 426edf6
