@@ -71,11 +71,14 @@ jobs:
             -DENABLE_TESTSUITE=OFF
           cmake --build vendor/supercollider/build -j"$(sysctl -n hw.ncpu)"
 
+      # source/max-sdk-base is a SUBMODULE (Cycling74/max-sdk-base): without
+      # --recurse-submodules the tree looks cloned but the includes are missing.
       - name: Max SDK
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/Cycling74/max-sdk.git max-sdk
-          test -d "$MAXSDK/c74support/max-includes" || { echo "unexpected max-sdk layout"; exit 1; }
+          git clone --depth 1 --recurse-submodules --shallow-submodules \
+            https://github.com/Cycling74/max-sdk.git max-sdk
+          test -d "$MAXSDK/c74support/max-includes" || { echo "unexpected max-sdk layout"; ls -la "$MAXSDK"; exit 1; }
 
       - name: Build sc3~ (bundle + ad-hoc signature + flat-namespace gate)
         working-directory: external
