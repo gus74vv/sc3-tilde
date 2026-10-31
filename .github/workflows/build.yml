@@ -28,17 +28,20 @@ jobs:
 
       # The engine compiles the *installed* class library and loads the installed
       # .scx plugins; it also takes libsndfile from SuperCollider.app/Frameworks.
+      # The 3.14.1 release publishes a universal .dmg for macOS (no .zip), so the
+      # app is mounted and copied out of it.
       - name: Install SuperCollider 3.14.1 (runtime dependency)
         run: |
           set -euo pipefail
           url=$(curl -sSL "https://api.github.com/repos/supercollider/supercollider/releases/tags/$SC_TAG" |
-            python3 -c 'import json,sys; r=json.load(sys.stdin); print(next(a["browser_download_url"] for a in r["assets"] if a["name"].endswith(".zip") and "macOS" in a["name"]))')
+            python3 -c 'import json,sys; r=json.load(sys.stdin); print(next(a["browser_download_url"] for a in r["assets"] if a["name"].endswith(".dmg") and "macOS-universal" in a["name"]))')
           echo "asset: $url"
-          curl -sSL "$url" -o "$RUNNER_TEMP/sc.zip"
-          unzip -q "$RUNNER_TEMP/sc.zip" -d "$RUNNER_TEMP/sc"
-          app=$(find "$RUNNER_TEMP/sc" -maxdepth 3 -name 'SuperCollider.app' -type d | head -1)
-          test -n "$app" || { echo "SuperCollider.app not found in the release zip"; find "$RUNNER_TEMP/sc" | head -40; exit 1; }
-          sudo ditto "$app" /Applications/SuperCollider.app
+          curl -sSL "$url" -o "$RUNNER_TEMP/sc.dmg"
+          mkdir -p "$RUNNER_TEMP/sc"
+          hdiutil attach "$RUNNER_TEMP/sc.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/sc"
+          test -d "$RUNNER_TEMP/sc/SuperCollider.app" || { ls -la "$RUNNER_TEMP/sc"; exit 1; }
+          sudo ditto "$RUNNER_TEMP/sc/SuperCollider.app" /Applications/SuperCollider.app
+          hdiutil detach "$RUNNER_TEMP/sc" -force || true
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/SuperCollider.app/Contents/Info.plist
 
       - name: Cache the SuperCollider static libs
