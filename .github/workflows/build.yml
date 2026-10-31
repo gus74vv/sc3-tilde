@@ -98,14 +98,14 @@ jobs:
       - name: Verify the bundles
         run: |
           set -euo pipefail
-          for bin in out/sc3~.mxo/Contents/MacOS/sc3~ external/sc_code/build/sc_code.mxo/Contents/MacOS/sc_code; do
+          for bundle in out/sc3~.mxo external/sc_code/build/sc_code.mxo; do
+            bin="$bundle/Contents/MacOS/$(basename "$bundle" .mxo)"
             echo "== $bin"
-            file "$bin"
-            file "$bin" | grep -q 'arm64' || { echo "not arm64"; exit 1; }
-            codesign --verify --strict "$(dirname "$(dirname "$bin")")"
+            file "$bin" | grep -q 'arm64' || { echo "not arm64"; file "$bin"; exit 1; }
+            codesign --verify --strict "$bundle"
             # dynamic deps: Apple system paths and our own @loader_path only
             bad=$(otool -L "$bin" | tail -n +2 |
                   grep -v -E '^[[:space:]]*(/usr/lib/|/System/Library/|@loader_path/|@executable_path/)' || true)
             if [ -n "$bad" ]; then echo "unexpected dependency:"; echo "$bad"; exit 1; fi
           done
-          ls -la out external/sc_code/build | head -20
+          ls -la out/sc3~.mxo/Contents external/sc_code/build | head -20
