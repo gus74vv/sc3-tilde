@@ -44,6 +44,13 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/sc" -force || true
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/SuperCollider.app/Contents/Info.plist
 
+      # SC's UGen plugins link against a system libsndfile. Without one, its CMake
+      # falls back to platform/mac/lib/scUBlibsndfile.a, which is Intel-only
+      # (i386,ppc,x86_64) -> the arm64 link fails with _sf_readf_float undefined.
+      # Only the statics need it: our own build takes the dylib from SC.app.
+      - name: libsndfile for the SC build
+        run: brew install libsndfile
+
       - name: Cache the SuperCollider static libs
         id: sc-cache
         uses: actions/cache@v4
