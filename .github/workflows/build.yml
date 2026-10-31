@@ -58,13 +58,25 @@ jobs:
           path: vendor/supercollider/build
           key: sc-statics-${{ runner.arch }}-${{ env.SC_COMMIT }}
 
+      # The cache holds ONLY the build directory, so a cache hit leaves no sources
+      # behind and every `#include <SC_…>` fails (measured: "SC_LanguageClient.h
+      # file not found" on the first cache-hit run). The clone is shallow and takes
+      # seconds; it is the cmake build that is worth caching, so the sources are
+      # always cloned. They land through a temp dir because `git clone` refuses a
+      # non-empty destination (the restored build/ dir).
+      - name: SuperCollider sources (pinned)
+        run: |
+          set -euo pipefail
+          git clone --branch "$SC_TAG" --depth 1 --recurse-submodules --shallow-submodules \
+            https://github.com/supercollider/supercollider.git "$RUNNER_TEMP/sc-src"
+          git -C "$RUNNER_TEMP/sc-src" rev-parse --short HEAD
+          mkdir -p vendor/supercollider
+          rsync -a --delete --exclude 'build/' "$RUNNER_TEMP/sc-src/" vendor/supercollider/
+
       - name: Build the pinned SuperCollider statics
         if: steps.sc-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          git clone --branch "$SC_TAG" --depth 1 --recurse-submodules --shallow-submodules \
-            https://github.com/supercollider/supercollider.git vendor/supercollider
-          git -C vendor/supercollider rev-parse --short HEAD
           cmake -S vendor/supercollider -B vendor/supercollider/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DSC_QT=OFF -DSC_IDE=OFF -DSC_ABLETON_LINK=OFF -DSUPERNOVA=OFF \
