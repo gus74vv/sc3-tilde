@@ -32,6 +32,7 @@
 #include <cstring>
 #include <filesystem>
 #include <map>
+#include <set>
 #include <thread>
 
 #include "OSC_Packet.h"   // struct OSC_Packet (server/scsynth)
@@ -175,6 +176,49 @@ static bool versionMajorMinor(const std::string &v, int *maj, int *min)
 	return true;
 }
 
+// Does this OSC packet carry `/clearSched` (top level or inside a bundle)?
+//
+// WHY THIS EXISTS (bug #22): the future timetags of the incoming bundles do NOT go
+// to the World's scheduler, they go to `Impl::pending` (see schedule()). scsynth's
+// `ClearSchedCmd` — what `Server:freeAll` sends as part of `CmdPeriod.run` — empties
+// the World's scheduler, which for us is always empty, so the bundles we hold kept
+// their timetag and ran AFTER the `/g_freeAll`. Ndef is the visible case: its
+// `/s_new` goes out with `server.latency` (0.2 s) ⇒ a panic inside that window left
+// the node created after the CmdPeriod, in a group that no longer existed (the
+// `FAILURE IN SERVER /s_new Group … not found`), or hanging in the root: orphan
+// units that no client can ever free (silence but DSP cost) — the DSP meter used to
+// stay high after `panic`. In scsynth `/clearSched` drops those bundles too.
+static bool oscIsClearSched(const char *data, int size)
+{
+	static const char kAddr[] = "/clearSched";
+	const int n = (int)sizeof(kAddr) - 1; // without the NUL
+	if (size < n + 1)
+		return false;
+	return std::memcmp(data, kAddr, (size_t)n) == 0 && data[n] == '\0';
+}
+
+static bool packetClearsSched(const char *data, int size)
+{
+	if (size < 8)
+		return false;
+	if (std::memcmp(data, "#bundle\0", 8) != 0)
+		return oscIsClearSched(data, size);
+	// Bundle: tag (8) + timetag (8) + repeated [int32 size BE][element].
+	int off = 16;
+	while (off + 4 <= size) {
+		int32_t raw = 0;
+		std::memcpy(&raw, data + off, 4);
+		const int elemsz = (int)ntohl((uint32_t)raw);
+		off += 4;
+		if (elemsz <= 0 || off + elemsz > size)
+			break;
+		if (packetClearsSched(data + off, elemsz))
+			return true;
+		off += elemsz;
+	}
+	return false;
+}
+
 int bindUdp(int port)
 {
 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -284,7 +328,11 @@ struct Sc3Engine::Impl {
 	bool stop = false;
 	bool bootDone = false;
 	bool bootOk = false;
-	int refs = 0;
+	// bug #23: owners, not a counter. `open(x)` / `release(x)` are idempotent per
+	// owner, so the same `sc3~` cannot inflate the count (a plain ++/-- did: on the
+	// "failed boot → open again" path the count drifted, the last `close` did not
+	// tear the World down and the engine stayed Ready with nobody using it).
+	std::set<const void *> owners; // nullptr = the headless tests/CLI
 
 	std::atomic<bool> ready {false};
 	std::atomic<int> state {kBootIdle};
@@ -442,6 +490,14 @@ struct Sc3Engine::Impl {
 
 	void perform(const struct sockaddr_in &from, char *data, int size, bool isBundle)
 	{
+		/* bug #22: `/clearSched` (Server:freeAll → CmdPeriod.run) has to drop the
+		   bundles waiting for a future timetag HERE, because they are not in the
+		   World's scheduler (see packetClearsSched). Order matters: clear first,
+		   then hand the packet to the World like any other. */
+		if (packetClearsSched(data, size)) {
+			pending.clear();
+			pendingBytes = 0;
+		}
 		reply.peer = from;
 		ReplyAddress ra {};
 		ra.mReplyData = &reply;
@@ -1163,7 +1219,7 @@ Sc3Engine::~Sc3Engine()
 	release();
 }
 
-bool Sc3Engine::open(const Sc3EngineConfig &cfg)
+bool Sc3Engine::open(const Sc3EngineConfig &cfg, const void *owner)
 {
 	Impl &s = *m;
 	// A previous attempt failed (port busy, broken library…): everything is
@@ -1173,9 +1229,9 @@ bool Sc3Engine::open(const Sc3EngineConfig &cfg)
 
 	std::lock_guard<std::mutex> lk(s.mtx);
 	const int boot = s.state.load();
-	s.refs++;
+	s.owners.insert(owner); // idempotent: the same object twice = one owner
 	if (boot == kBootBooting || boot == kBootReady)
-		return true; // a boot is already running / done (shared, refcount)
+		return true; // a boot is already running / done (shared)
 
 	// 3.1: start and RETURN. The worker publishes the result by itself.
 	s.cfg = cfg;
@@ -1203,14 +1259,14 @@ bool Sc3Engine::waitReady(int timeoutMs)
 	       s.bootOk;
 }
 
-void Sc3Engine::release()
+void Sc3Engine::release(const void *owner)
 {
 	Impl &s = *m;
 	{
 		std::unique_lock<std::mutex> lk(s.mtx);
-		if (s.refs <= 0)
-			return;
-		if (--s.refs > 0)
+		if (s.owners.erase(owner) == 0)
+			return; // not an owner (or already released): releasing twice is a no-op
+		if (!s.owners.empty())
 			return;
 		s.stop = true;
 		s.cancel.store(true); // if it is still booting, cut between steps
@@ -1289,6 +1345,27 @@ bool Sc3Engine::isReady() const
 bool Sc3Engine::isBooting() const
 {
 	return m->state.load() == kBootBooting;
+}
+
+const char *Sc3Engine::stateName() const
+{
+	switch (m->state.load()) {
+	case kBootBooting:
+		return "booting";
+	case kBootReady:
+		return "ready";
+	case kBootFailed:
+		return "failed";
+	default:
+		return "idle";
+	}
+}
+
+long Sc3Engine::queuedJobs() const
+{
+	Impl &s = *m;
+	std::lock_guard<std::mutex> lk(s.mtx);
+	return (long)s.queue.size();
 }
 
 Sc3EngineStatus Sc3Engine::status() const

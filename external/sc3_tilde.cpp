@@ -224,6 +224,27 @@ static void sc3_post(t_sc3 *x, const char *fmt, ...)
 	sc3_emit(x, x->out_post, "post", buf);
 }
 
+/* The object's OWN voice (open / close / panic / hardstop / freeall): always to
+   Max's console and to the `post` outlet.
+
+   `sc3_post` mirrors only with `console 1` (bug #20: a patch that wires
+   [print post] turns the mirror off so each engine line comes out once). For the
+   lifecycle that rule is wrong: with the flag off, a `close` + `open` made the
+   object look dead — the engine booted (or failed) and NOTHING said so anywhere
+   (bug #23). So the lifecycle skips the flag. Cost: in a patch with `console 0`
+   AND [print post] wired, these few lines show up twice (once from here, once
+   from [print]); engine text keeps its "once" contract. */
+static void sc3_note(t_sc3 *x, const char *fmt, ...)
+{
+	char buf[1024];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	object_post((t_object *)x, "%s", buf);
+	sc3_emit(x, x->out_post, "post", buf);
+}
+
 /* Max splits a message box's text into atoms: commas and semicolons
    SEPARATE messages unless they are escaped with a backslash (\, \;). If the user
    pastes the escaped version, Max usually consumes the backslash already; if it
@@ -362,11 +383,11 @@ static void sc3_report_status(t_sc3 *x)
 {
 	Sc3Engine &eng = Sc3Engine::instance();
 	if (!x->opened) {
-		sc3_post(x, "sc3~ v%s engine=off (send `open`)", SC3_TILDE_VERSION);
+		sc3_note(x, "sc3~ v%s engine=off (send `open`)", SC3_TILDE_VERSION);
 		return;
 	}
 	Sc3EngineStatus st = eng.status();
-	const char *stateName = st.ready ? "ready" : (st.failed ? "failed" : "booting");
+	const char *stateName = eng.stateName(); /* idle / booting / ready / failed */
 	/* 3.3: "dsp on/off" is THIS instance's state in the audio chain; with it off
 	   the World advances from main's clock (N blocks pumped per tick). */
 	const int dspOn = x->opened && x->pump_running && st.ready
@@ -378,10 +399,10 @@ static void sc3_report_status(t_sc3 *x)
 	         x->maxvec, st.numUnits, st.degraded ? "yes" : "no",
 	         st.scVersion.empty() ? "?" : st.scVersion.c_str());
 	sc3_post(x, "  sr=%s dsp=%s pumped=%ld blocks (cumulative, DSP off only) lag=%ld "
-	            "console=%s",
+	            "console=%s queued=%ld",
 	         st.sampleRateFromHost ? "project (DSP chain)" : "s.options",
 	         dspOn ? "on" : "off", eng.pumpedBlocks(), eng.pumpLagBlocks(),
-	         x->console_on ? "on" : "off");
+	         x->console_on ? "on" : "off", eng.queuedJobs());
 	sc3_post(x, "  s.options: maxNodes=%ld memSize=%ldKB buses=%ld blockSize=%ld maxLogins=%ld",
 	         st.maxNodes, st.memSizeKB, st.numAudioBusChannels, st.blockSize, st.maxLogins);
 	/* 4.x: World port. With 0 (default) the kernel picks it: that is what makes
@@ -397,6 +418,11 @@ static void sc3_report_status(t_sc3 *x)
 	   patch, or a minor forced with `@allowscversion`). */
 	if (!st.versionNote.empty())
 		sc3_post(x, "  version: %s", st.versionNote.c_str());
+	if (!x->console_on)
+		sc3_note(x, "  console=off: this instance sends the engine text to its outlets "
+		            "only (`console 1` mirrors it here too); %d instance(s) mirror now — "
+		            "if another patch's sc3~ has [print] wired it takes the text first",
+		         gConsoleInstances);
 	sc3_post(x, "  3.5: ch=%ld buses=%ld..%ld (of %ld served) underruns=%ld",
 	         x->nchan, x->busoff, x->busoff + x->nchan - 1, eng.servedBuses(),
 	         eng.underruns());
@@ -430,6 +456,28 @@ static void sc3_report_status(t_sc3 *x)
 
 /* ------------------------------------------------------------------ mensajes */
 
+/* The engine is a process-wide singleton: this object's `opened` flag is only a
+   cache of it. When they disagree — a boot cancelled by another instance's
+   `close`, a patch that was closed from elsewhere, a World that failed after the
+   boot — an `eval` used to be queued forever with NOTHING said, which is exactly
+   what "the object stopped answering" looks like (bug #23). Syncing the flag here
+   is also what makes the next `open` boot again instead of answering "already
+   open". */
+static bool sc3_require_engine(t_sc3 *x, const char *what)
+{
+	Sc3Engine &eng = Sc3Engine::instance();
+	if (eng.isReady() || eng.isBooting())
+		return true;
+	if (x->opened) {
+		x->opened = false;
+		object_error((t_object *)x, "%s: the engine is %s (not open) — send `open`", what,
+		             eng.stateName());
+	} else {
+		object_error((t_object *)x, "%s: send `open` first", what);
+	}
+	return false;
+}
+
 static void sc3_open(t_sc3 *x)
 {
 	// After a failed boot (port busy, broken library…) the engine was left in
@@ -437,8 +485,11 @@ static void sc3_open(t_sc3 *x)
 	// clears everything and starts from scratch). If it is healthy, it is
 	// idempotent.
 	Sc3Engine &engine = Sc3Engine::instance();
-	if (x->opened && !engine.status().failed) {
-		sc3_post(x, "open: already open (idempotent)");
+	/* The ENGINE decides, not the flag: "ready" and "booting" mean there is nothing
+	   to do; anything else (idle/failed) has to boot again, even if the flag still
+	   says open. */
+	if (x->opened && (engine.isReady() || engine.isBooting())) {
+		sc3_note(x, "open: already open (idempotent)");
 		return;
 	}
 	Sc3EngineConfig cfg;
@@ -446,7 +497,7 @@ static void sc3_open(t_sc3 *x)
 
 	// 3.1: ASYNCHRONOUS boot. open() returns right away; the result (ready or
 	// error) is detected by sc3_flush and posted without blocking Max's UI.
-	if (!Sc3Engine::instance().open(cfg)) {
+	if (!Sc3Engine::instance().open(cfg, x)) {
 		Sc3EngineStatus st = Sc3Engine::instance().status();
 		std::string err = st.error.empty() ? "open failed (was there a previous close?)" : st.error;
 		sc3_emit(x, x->out_err, "error", err.c_str());
@@ -461,24 +512,24 @@ static void sc3_open(t_sc3 *x)
 		sc3_report_status(x);
 		x->boot_seen = 2;
 	} else {
-		sc3_post(x, "open: booting in the background (sclang + World) — the UI is not blocked");
+		sc3_note(x, "open: booting in the background (sclang + World) — the UI is not blocked");
 	}
 }
 
 static void sc3_close(t_sc3 *x)
 {
 	if (!x->opened) {
-		sc3_post(x, "close: was not open");
+		sc3_note(x, "close: was not open");
 		return;
 	}
 	if (Sc3Engine::instance().isBooting())
-		sc3_post(x, "close: waiting for the boot to finish (the VM cannot be aborted "
+		sc3_note(x, "close: waiting for the boot to finish (the VM cannot be aborted "
 		            "halfway through compileLibrary)");
 	sc3_pump_stop(x);
-	Sc3Engine::instance().release();
+	Sc3Engine::instance().release(x);
 	x->opened = false;
 	x->boot_seen = 0;
-	sc3_post(x, "close: engine closed");
+	sc3_note(x, "close: engine closed");
 }
 
 static void sc3_bang(t_sc3 *x)
@@ -551,10 +602,8 @@ static void sc3_cancel_stop(t_sc3 *x)
 static void sc3_send(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 {
 	(void)s; // selector = "send"
-	if (!x->opened) {
-		sc3_emit(x, x->out_err, "error", "send: `open` first");
+	if (!sc3_require_engine(x, "send"))
 		return;
-	}
 	if (argc < 1) {
 		sc3_emit(x, x->out_err, "error", "send: missing the SC message (e.g. send s.boot)");
 		return;
@@ -589,10 +638,8 @@ static std::string sc3_ctx_setup(const t_sc3 *x)
 static void sc3_eval(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 {
 	(void)s;
-	if (!x->opened) {
-		sc3_emit(x, x->out_err, "error", "eval: `open` first");
+	if (!sc3_require_engine(x, "eval"))
 		return;
-	}
 	// [textedit] sends `text <buffer>`. If the Max container did not drop the
 	// selector (e.g. with outputmode 1 the buffer travels as ONE symbol and
 	// "text" arrives as the first argument), we skip it: no valid SC line starts
@@ -627,10 +674,8 @@ static void sc3_eval(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 static void sc3_set(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 {
 	(void)s; // selector = "set"
-	if (!x->opened) {
-		sc3_emit(x, x->out_err, "error", "set: `open` first");
+	if (!sc3_require_engine(x, "set"))
 		return;
-	}
 	// 1 target + N key/value pairs. Anything else is a typo, not a parameter
 	// change (and it keeps us away from the generic `set <value>` that Max
 	// preset/pattr objects send to their targets).
@@ -671,10 +716,8 @@ static void sc3_set(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 
 static void sc3_evalfile(t_sc3 *x, t_symbol *s)
 {
-	if (!x->opened) {
-		sc3_emit(x, x->out_err, "error", "evalfile: `open` first");
+	if (!sc3_require_engine(x, "evalfile"))
 		return;
-	}
 	if (!s || !s->s_name || !s->s_name[0]) {
 		sc3_emit(x, x->out_err, "error", "evalfile: missing the path");
 		return;
@@ -714,7 +757,7 @@ static void sc3_evalfile(t_sc3 *x, t_symbol *s)
 static void sc3_request_stop(t_sc3 *x, int kind)
 {
 	if (!x->opened) {
-		sc3_emit(x, x->out_err, "error", "panic/hardstop/freeall: primero `open`");
+		object_error((t_object *)x, "panic/hardstop/freeall: send `open` first");
 		return;
 	}
 	x->gain_target.store(0.0f);
@@ -725,19 +768,19 @@ static void sc3_request_stop(t_sc3 *x, int kind)
 static void sc3_panic(t_sc3 *x)
 {
 	sc3_request_stop(x, 1);
-	sc3_post(x, "panic: CmdPeriod.run (nodes + clocks + hooks)");
+	sc3_note(x, "panic: CmdPeriod.run (nodes + clocks + hooks)");
 }
 
 static void sc3_hardstop(t_sc3 *x)
 {
 	sc3_request_stop(x, 2);
-	sc3_post(x, "hardstop: CmdPeriod.hardRun (includes TempoClock.default)");
+	sc3_note(x, "hardstop: CmdPeriod.hardRun (includes TempoClock.default)");
 }
 
 static void sc3_freeall(t_sc3 *x)
 {
 	sc3_request_stop(x, 3);
-	sc3_post(x, "freeall: s.freeAll (nodes only; clocks and Routines keep running)");
+	sc3_note(x, "freeall: s.freeAll (nodes only; clocks and Routines keep running)");
 }
 
 static void sc3_assist(t_sc3 *x, void *b, long m, long a, char *s)
@@ -866,7 +909,7 @@ static void sc3_flush(t_sc3 *x)
 				object_error((t_object *)x, "%s", err.c_str());
 				// Release the failed engine: the object is left as freshly created
 				// (eval asks for open, and open starts clean). No patch reload.
-				eng.release();
+				eng.release(x);
 				x->opened = false;
 				x->boot_seen = 0;
 			}
@@ -1284,7 +1327,7 @@ static void sc3_free(t_sc3 *x)
 		x->input_claimed = 0;
 	}
 	if (x->opened) {
-		Sc3Engine::instance().release();
+		Sc3Engine::instance().release(x);
 		x->opened = false;
 	}
 	if (x->console_on) { /* bug #20: the counter must not drift when a patch closes */

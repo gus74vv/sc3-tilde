@@ -137,8 +137,12 @@ class Sc3Engine {
 public:
 	static Sc3Engine &instance();
 
-	// Creates (or reuses) the engine. Refcount: open() increments, release()
-	// decrements and the last one destroys everything.
+	// Creates (or reuses) the engine. `owner` names who is opening it (the `sc3~`
+	// object; nullptr for the headless tests/CLI). open()/release() are counted BY
+	// OWNER, so a double `open` from the same object cannot leak a reference: with a
+	// plain counter it could, and then `close` never tore the World down — the engine
+	// stayed Ready (DSP still running) while the object said "closed", and the next
+	// `open` answered "already open" with no boot to show (bug #23).
 	//
 	// Phase 3.1: open() is ASYNCHRONOUS — it returns immediately (the sclang boot
 	// takes ~1–3 s and used to block Max's main thread). It returns false only if
@@ -149,8 +153,8 @@ public:
 	// silence ⇒ the audio thread does not touch the World. When it finishes the
 	// state publishes itself; the caller queries it with status() (or waits with
 	// waitReady).
-	bool open(const Sc3EngineConfig &cfg);
-	void release();
+	bool open(const Sc3EngineConfig &cfg, const void *owner = nullptr);
+	void release(const void *owner = nullptr);
 
 	// Waits for the boot to finish. Tests/CLI only: blocks the thread.
 	bool waitReady(int timeoutMs = 120000);
@@ -158,6 +162,13 @@ public:
 	bool isReady() const;
 	bool isBooting() const;
 	Sc3EngineStatus status() const;
+
+	// Diagnostics for `info`/`sc3~`: the boot state as a word (idle / booting /
+	// ready / failed) and how many evals are still waiting for the worker. A
+	// queue that does not drain is the signature of a busy (or stuck) sclang, which
+	// used to look like "the object stopped answering".
+	const char *stateName() const;
+	long queuedJobs() const;
 
 	// --- sclang: enqueue only (the worker runs it) ---------------------------
 	// eval() prints the result like the IDE post window (`-> value`);
@@ -266,10 +277,10 @@ public:
 	Sc3Engine &operator=(const Sc3Engine &) = delete;
 
 private:
-	// Drops worker + World + socket and leaves the engine Idle. Used when refs
-	// reach 0 and also to retry a boot that was left Failed (port taken by the SC
-	// IDE, broken library, …): that way `open` works again without reloading the
-	// patch.
+	// Drops worker + World + socket and leaves the engine Idle. Used when the last
+	// owner releases and also to retry a boot that was left Failed (port taken by
+	// the SC IDE, broken library, …): that way `open` works again without
+	// reloading the patch.
 	void teardown();
 	Sc3Engine();
 	~Sc3Engine();

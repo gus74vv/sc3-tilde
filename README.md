@@ -88,7 +88,9 @@ console** with the SC IDE's look (raw lines, no object prefix), so a lone `[sc3~
 its `post` output, warnings and errors with nothing patched. Wire `[print]` to them only
 if you want to route the text yourself, and set `console 0` first so each line is
 printed once instead of twice. `console` is **per instance**: a patch that silences its
-own mirroring never silences the console of another patch.
+own mirroring never silences the console of another patch. The lifecycle lines
+(`open`/`close`/`panic`/`hardstop`) are the exception: they always print to the console,
+because with `console 0` a slow boot or a failed `close` would look like a dead object.
 
 ### Attributes
 
