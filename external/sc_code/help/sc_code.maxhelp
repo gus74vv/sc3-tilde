@@ -30,7 +30,7 @@
 				"box": {
 					"id": "obj-1",
 					"maxclass": "comment",
-					"text": "sc_code — in-patch sclang code editor for sc3~  (0.9.0)",
+					"text": "sc_code — in-patch sclang code editor for sc3~  (0.9.5)",
 					"numinlets": 1,
 					"numoutlets": 0,
 					"patching_rect": [
@@ -188,7 +188,7 @@
 				"box": {
 					"id": "obj-11",
 					"maxclass": "comment",
-					"text": "@blink 1 + @blinkduration 400 + @blinkcolor 1.0 0.55 0.15 0.40 (blink of the evaluated block: InCubic fade; the IDE uses 600 ms).\n@scrollspeed 1. (wheel / trackpad factor: 1 = slow; try 4–10 — with a trackpad the author uses 9) · @file /path/x.scd with @autoload 1 (loads when set) and @autowrite 1 (autosaves, 400 ms debounce).",
+					"text": "@blink 1 + @blinkduration 500 + @blinkcolor 1.0 0.55 0.15 0.40 (blink of the evaluated block: InCubic fade; the IDE uses 600 ms).\n@scrollspeed 3. (wheel / trackpad factor: 3 = default; 1 = slow, the author uses 9 with a trackpad) · @file /path/x.scd with @autoload 1 (loads when set) and @autowrite 1 (autosaves, 400 ms debounce).",
 					"numinlets": 1,
 					"numoutlets": 0,
 					"patching_rect": [
@@ -251,6 +251,23 @@
 						260,
 						22
 					]
+				}
+			},
+			{
+				"box": {
+					"id": "obj-15",
+					"maxclass": "comment",
+					"text": "DROP: drag a file from the Finder onto the box and its path lands at the caret as \"~/Documents/x.wav\" (quoted, one undo step, also works with the patcher locked). Note: sclang does not expand ~ itself: use \"~\".standardizePath or the absolute path if you are going to evaluate it.",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						740,
+						470,
+						260,
+						55
+					],
+					"fontsize": 11.0,
+					"fontname": "Menlo"
 				}
 			}
 		],

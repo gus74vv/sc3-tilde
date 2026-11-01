@@ -23,9 +23,9 @@ ARCHFLAGS := -arch $(SC_CODE_ARCH) -mmacosx-version-min=$(SC_CODE_MINOS)
 B := build
 
 CORE_SRC := sc_lexer.cpp sc_region.cpp sc_buffer.cpp sc_indent.cpp sc_scroll.cpp sc_highlight.cpp \
-            sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp
+            sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp
 CORE_HDR := sc_lexer.h sc_region.h sc_buffer.h sc_indent.h sc_scroll.h sc_highlight.h sc_bracket.h \
-            sc_wrap.h sc_blink.h sc_snip.h
+            sc_wrap.h sc_blink.h sc_snip.h sc_path.h
 # Pure C++ for the tests; the clipboard (ObjC++) only goes into the bundle.
 UI_SRC := sc_code.cpp sc_clipboard.mm sc_filedialog.mm
 UI_HDR := sc_code.cpp sc_clipboard.h sc_filedialog.h
@@ -45,7 +45,8 @@ $(B)/region_test: tests/region_test.cpp $(CORE_SRC) $(CORE_HDR)
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/region_test.cpp $(CORE_SRC) -o $@
 
 test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/scroll_test \
-      $(B)/highlight_test $(B)/bracket_test $(B)/wrap_test $(B)/blink_test $(B)/snip_test
+      $(B)/highlight_test $(B)/bracket_test $(B)/wrap_test $(B)/blink_test $(B)/snip_test \
+      $(B)/path_test
 	./$(B)/lexer_test
 	./$(B)/region_test
 	./$(B)/buffer_test
@@ -56,6 +57,12 @@ test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/sc
 	./$(B)/wrap_test
 	./$(B)/blink_test
 	./$(B)/snip_test
+	./$(B)/path_test
+
+# S7 (0.9.5): drop-path formatting — pure strings, no Max (SCODE.md §12).
+$(B)/path_test: tests/path_test.cpp sc_path.cpp sc_path.h
+	@mkdir -p $(B)
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/path_test.cpp sc_path.cpp -o $@
 # S5e: visual wrap (needs the buffer for the cells/code points).
 $(B)/wrap_test: tests/wrap_test.cpp sc_wrap.cpp sc_wrap.h sc_buffer.cpp sc_buffer.h
 	@mkdir -p $(B)
@@ -102,7 +109,7 @@ $(B)/highlight_test: tests/highlight_test.cpp sc_highlight.cpp sc_highlight.h $(
 # but the code is the full editor. `sc_code` is pure UI: it links neither SC nor MSP
 # (every Max symbol is resolved by the host with -undefined dynamic_lookup).
 # Bundle version (keep it in sync with SC_CODE_VERSION in sc_code.cpp).
-SC_CODE_VER := 0.9.3
+SC_CODE_VER := 0.9.5
 
 $(B)/sc_code.mxo: $(UI_SRC) $(UI_HDR) bundle/Info.plist.in $(CORE_SRC) $(CORE_HDR) $(B)/jpatcher_syms.o
 	@mkdir -p $(B)/sc_code.mxo/Contents/MacOS

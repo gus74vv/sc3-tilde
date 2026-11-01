@@ -31,6 +31,7 @@
 
 #include "ext.h"
 #include "ext_obex.h"
+#include "ext_drag.h" /* jdrag_*: drops, including Finder files (SCODE.md §12) */
 #include "jpatcher_api.h"
 #include "jpatcher_syms.h" /* jpatcher_syms_init(): WITHOUT this jbox_new() segfaults (bug #17) */
 #include "jgraphics.h"
@@ -50,12 +51,17 @@
 #include "sc_filedialog.h"
 #include "sc_highlight.h"
 #include "sc_indent.h"
+#include "sc_path.h"
 #include "sc_region.h"
 #include "sc_scroll.h"
 #include "sc_snip.h"
 #include "sc_wrap.h"
 
-/* 0.9.1: `@scrollspeed <float>` (default 1.) — multiplies the delta of the mouse
+/* 0.9.4: the context menu pops AT the click point (it appeared far outside the box
+ * when the box was not near the canvas origin: the box-local mouse point was passed
+ * as canvas coordinates) and two defaults changed by user request: `@blinkduration`
+ * 500 ms (was 400) and `@scrollspeed` 3. (was 1.).
+ * 0.9.1: `@scrollspeed <float>` (default 1.) — multiplies the delta of the mouse
  * wheel and of the trackpad (two fingers): with 1 the trackpad felt very slow. It
  * is also registered as a message (`scrollspeed 4.`), same lesson as `@snippets`.
  * 0.9.0 (S6): SNIPPETS. `@snippets <path>` loads a text file with `### key` blocks
@@ -63,13 +69,13 @@
  * `snip.key` REPLACES the evaluated text with the snippet — it does not evaluate
  * it, it does not emit `eval` to the engine (sc3~ does not know what `snip.kick`
  * is), caret at the end, one undo step. Hot-reload by mtime/size on every
- * invocation. 0.8.4 (S5e): `@blinkduration` (ms, default 400) and the blink curve
+ * invocation. 0.8.4 (S5e): `@blinkduration` (ms, default 500 since 0.9.4) and the blink curve
  * becomes the IDE one (`QEasingCurve::InCubic`, `overlay.cpp` blinkCode) — checked
  * in the source: the IDE also has the duration as a setting (default 600) and also
  * blinks the WHOLE block (trailing `//` comment included) because `blinkCode`
  * covers StartOfBlock..EndOfBlock. 0.8.3 (S5e): WRAP to the box width (the text is
  * reflowed on resize; before, a long line could only be read by enlarging the box,
- * there was no horizontal scroll) + BLINK of the evaluated block (400 ms, color by
+ * there was no horizontal scroll) + BLINK of the evaluated block (500 ms, color by
  * attribute). 0.8.1: Save/Load use NSSavePanel/NSOpenPanel with UTType (`.scd`
  * guaranteed; the Max panel did not enforce it). 0.8.0 (S5d): context menu (right
  * click) with undo/redo, cut/copy/paste/delete/select all and Save/Load to .scd.
@@ -78,7 +84,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.3"
+#define SC_CODE_VERSION "0.9.5"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -151,9 +157,9 @@ typedef struct _sc_code {
 
 	/* --- S5e: evaluation blink -------------------------------------------- */
 	long evalblink;             /* 1 = blink del bloque evaluado (default 1) */
-	long blinkduration;         /* blink ms (default 400, the IDE uses 600) */
+	long blinkduration;         /* blink ms (default 500, the IDE uses 600) */
 	t_jrgba blinkcolor;         /* color del blink (RGBA, atributo) */
-	t_clock *blink_clock;       /* repaints the fade (400 ms in 25 ms steps) */
+	t_clock *blink_clock;       /* repaints the fade (500 ms in 25 ms steps) */
 	sc_code::Blink blink_state; /* rango + reloj del blink (sc_blink.h, headless) */
 
 	/* --- S6: snippets (`snip.KEY` ⇒ the body of the file) ---------------- */
@@ -161,7 +167,7 @@ typedef struct _sc_code {
 	ScSnipState *snips;         /* dict parseado + stamp del hot-reload */
 
 	/* --- 0.9.1: wheel / trackpad speed ------------------------------------ */
-	double scrollspeed;         /* @scrollspeed: px per delta unit (default 1.) */
+	double scrollspeed;         /* @scrollspeed: px per delta unit (default 3.) */
 } t_sc_code;
 
 static t_class *s_sc_code_class = NULL;
@@ -177,7 +183,7 @@ static double sc_code_now_ms() {
 
 /* --- S5e: blink of the evaluated block --------------------------------------- */
 
-/* One fade tick: when the blink clock says it is over (400 ms), it turns off and
+/* One fade tick: when the blink clock says it is over (500 ms), it turns off and
  * repaints one last time without the background. In the meantime it repaints with
  * whatever alpha applies; paint is cheap (only visible rows). */
 static void sc_code_blink_tick(t_sc_code *x) {
@@ -594,7 +600,7 @@ static t_max_err sc_code_set_blinkduration(t_sc_code *x, t_object *attr, long ar
 	return MAX_ERR_NONE;
 }
 
-/* `@scrollspeed` (<float>, default 1.): factor of the `mousewheel` delta. Max sends
+/* `@scrollspeed` (<float>, default 3.): factor of the `mousewheel` delta. Max sends
  * the trackpad delta in small units and many per second ⇒ with factor 1 the scroll
  * ends up slow. Clamp [0.05, 50]: 0 would leave the wheel dead (confusing) and more
  * than 50 is a jump per event. */
@@ -616,6 +622,81 @@ static void sc_code_scrollspeed_msg(t_sc_code *x, double v) {
 	t_atom a[1];
 	atom_setfloat(a, v);
 	sc_code_set_scrollspeed(x, NULL, 1, a);
+}
+
+/**********************************************************************/
+/* drops from the Finder                                               */
+
+/* Drag & drop of files from the Finder. Measured, not guessed (SCODE.md §12):
+ * `ext_drag.h` says it only covers the Max file browser, but the drag of a Finder
+ * file is delivered through the same `jdrag` object, so the road is the one
+ * `buffer~` and `sfplay~` use — `acceptsdrag_locked` / `acceptsdrag_unlocked` — plus
+ * a plain message that Max calls when the file is released:
+ *
+ *   1. `acceptsdrag_*` (x, drag, view): announce a drop action with `jdrag_add` and
+ *      return 1 (0 refuses the drop and Max shows "unlock the patcher…").
+ *   2. `<msg>` (x, drag): `jdrag_itemcount` + `jdrag_getitemstring` give the
+ *      pathnames, in Max's volume dialect (`Macintosh HD:/Users/...`).
+ *
+ * `dropfile.mxo` (the only stock external that also registers `candropfiles` /
+ * `dropfiles`) confirmed the atom layout, but those two never fired on a box drop;
+ * the accepted-drag pair does. Shortening to `~` and quoting live in `sc_path.cpp`
+ * (headless, gated); the insertion uses the typing path ⇒ a single undo step. */
+static void sc_code_insert_drop(t_sc_code *x, const std::vector<std::string> &names) {
+	if (names.empty() || x->readonly || !x->buf)
+		return;
+
+	const char *home = getenv("HOME");
+	const std::string text = sc_code::dropped_text(home ? home : "", names);
+	if (text.empty())
+		return;
+
+	const int line_before = x->buf->line_of_offset(x->buf->caret());
+	x->buf->insert_text(text); /* replaces the selection: one undo step */
+	sc_code_after_key(x, line_before);
+	if (x->autowrite)
+		sc_code_autowrite_poke(x);
+	jbox_redraw(&x->j_box);
+}
+
+/* Same body for the locked and the unlocked patcher: in both cases the answer is
+ * "yes, I take it". Measured: this is called on EVERY mouse move of the drag (not
+ * once), so it has to stay cheap and silent, and the role filter cannot use
+ * `jdrag_matchdragrole(drag, gensym("file"))` — a Finder WAV matches `audiofile`
+ * only (`file` gives 0). The guard is instead that the first item has to resolve to
+ * a file that exists (`stat`), which is what separates a Finder drop from dragging a
+ * Max object over the box. */
+static long sc_code_acceptsdrag(t_sc_code *x, t_object *drag, t_object *view) {
+	(void)view;
+	if (x->readonly || !x->buf || !drag)
+		return 0;
+	if (jdrag_itemcount(drag) <= 0)
+		return 0;
+	const char *item = jdrag_getitemstring(drag, 0, 0, 0);
+	if (!item || !item[0])
+		return 0;
+	const std::string path = sc_code::path_to_posix(item);
+	struct stat st;
+	if (stat(path.c_str(), &st) != 0)
+		return 0;
+	jdrag_add(drag, (t_object *)x, gensym("dropfile"), "Insert path", NULL);
+	return 1;
+}
+
+/* Called by Max when the drag is released on the box (registered A_CANT, the drag
+ * object arrives as the second argument, exactly as in `dropfile.mxo`). */
+static void sc_code_dropfile(t_sc_code *x, t_object *drag) {
+	if (x->readonly || !x->buf || !drag)
+		return;
+	const long count = jdrag_itemcount(drag);
+	std::vector<std::string> names;
+	for (long i = 0; i < count; ++i) {
+		const char *name = jdrag_getitemstring(drag, i, 0, 0);
+		if (!name || !name[0])
+			continue;
+		names.push_back(name);
+	}
+	sc_code_insert_drop(x, names);
 }
 
 static t_max_err sc_code_set_file(t_sc_code *x, t_object *attr, long argc, t_atom *argv) {
@@ -782,7 +863,7 @@ C74_EXPORT void ext_main(void *r) {
 
 	CLASS_ATTR_LONG(c, "blinkduration", 0, t_sc_code, blinkduration);
 	CLASS_ATTR_ACCESSORS(c, "blinkduration", NULL, (method)sc_code_set_blinkduration);
-	CLASS_ATTR_DEFAULT_SAVE(c, "blinkduration", 0, "400");
+	CLASS_ATTR_DEFAULT_SAVE(c, "blinkduration", 0, "500");
 
 	CLASS_ATTR_RGBA(c, "blinkcolor", 0, t_sc_code, blinkcolor);
 	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "blinkcolor", 0, "1.0 0.55 0.15 0.40");
@@ -790,8 +871,13 @@ C74_EXPORT void ext_main(void *r) {
 	/* --- 0.9.1: wheel / trackpad speed ------------------------------------- */
 	CLASS_ATTR_DOUBLE(c, "scrollspeed", 0, t_sc_code, scrollspeed);
 	CLASS_ATTR_ACCESSORS(c, "scrollspeed", NULL, (method)sc_code_set_scrollspeed);
-	CLASS_ATTR_DEFAULT_SAVE(c, "scrollspeed", 0, "1.");
+	CLASS_ATTR_DEFAULT_SAVE(c, "scrollspeed", 0, "3.");
 	class_addmethod(c, (method)sc_code_scrollspeed_msg, "scrollspeed", A_FLOAT, 0);
+
+	/* --- 0.9.5: files dropped from the Finder (SCODE.md §12) ---------------- */
+	class_addmethod(c, (method)sc_code_acceptsdrag, "acceptsdrag_locked", A_CANT, 0);
+	class_addmethod(c, (method)sc_code_acceptsdrag, "acceptsdrag_unlocked", A_CANT, 0);
+	class_addmethod(c, (method)sc_code_dropfile, "dropfile", A_CANT, 0);
 
 	class_register(CLASS_BOX, c);
 	s_sc_code_class = c;
@@ -871,7 +957,7 @@ static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv) {
 	x->view_w = x->view_h = 0.;
 	x->sb_drag = 0;
 	x->sb_grab = 0.;
-	x->scrollspeed = 1.;
+	x->scrollspeed = 3.;
 
 	attr_dictionary_process((t_object *)x, d); /* box attributes (rect, …) */
 	/* Text stored by `jsave`: it wins over `@file` (it is the exact state the patch
@@ -1237,12 +1323,12 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	sc_code_paint_range(x, g, m, x->selcolor, buf.selection_start(), buf.selection_end(), first, last);
 
 	/* S5e — evaluation blink: the SAME range that was sent to sclang, with the alpha
-	 * the fade marks (400 ms, sc_blink). It goes after the selection so that it shows
+	 * the fade marks (500 ms, sc_blink). It goes after the selection so that it shows
 	 * even when the evaluated block is the selection. */
 	if (x->blink_state.active()) {
 		const double a = x->blink_state.alpha(sc_code_now_ms());
 		/* The offsets are clamped to the current document: the range was computed at eval
-		 * time and the text may have shrunk during these 400 ms (no garbage must be
+		 * time and the text may have shrunk during these 500 ms (no garbage must be
 		 * drawn). */
 		const int b0 = x->blink_state.start_off();
 		const int b1 = x->blink_state.end_off() < buf.length() ? x->blink_state.end_off() : buf.length();
@@ -1883,12 +1969,25 @@ static void sc_code_popup_menu(t_sc_code *x, t_object *patcherview, t_pt pt) {
 					   NULL);
 	jpopupmenu_additem(menu, SC_MENU_LOAD, "Load from .scd…", NULL, 0, 0, NULL);
 
-	/* `pt` comes in canvas coordinates ⇒ converted for the menu (screen). */
-	long sx = 0, sy = 0;
-	patcherview_canvas_to_screen(patcherview, pt.x, pt.y, &sx, &sy);
+	/* `pt` is in BOX-local coordinates (the same space as the hit tests above: 0,0
+	 * is the top-left corner of the box), while `patcherview_canvas_to_screen`
+	 * expects CANVAS coordinates. Passing `pt` as is put the menu at the canvas
+	 * position of the click plus/minus the patcher scroll (0.9.4: the user saw it
+	 * "far outside the box" depending on where the box sat in the patcher). The
+	 * canvas point is the box rect origin plus `pt`, and two canvas points (the
+	 * origin and the bottom-right corner) give the canvas→screen scale so a ZOOMED
+	 * patcher also lands the menu under the cursor. */
+	t_rect rect;
+	long ox = 0, oy = 0, fx = 0, fy = 0;
+	if (jbox_get_rect_for_view((t_object *)x, patcherview, &rect) != MAX_ERR_NONE)
+		rect.x = rect.y = 0.;
+	patcherview_canvas_to_screen(patcherview, rect.x, rect.y, &ox, &oy);
+	patcherview_canvas_to_screen(patcherview, rect.x + rect.width, rect.y + rect.height, &fx, &fy);
+	const double zoom_x = rect.width > 0. ? (double)(fx - ox) / rect.width : 1.;
+	const double zoom_y = rect.height > 0. ? (double)(fy - oy) / rect.height : zoom_x;
 	t_pt where;
-	where.x = (double)sx;
-	where.y = (double)sy;
+	where.x = (double)ox + pt.x * zoom_x;
+	where.y = (double)oy + pt.y * zoom_y;
 	const int item = jpopupmenu_popup(menu, where, 0);
 	jpopupmenu_destroy(menu);
 	if (item > 0)

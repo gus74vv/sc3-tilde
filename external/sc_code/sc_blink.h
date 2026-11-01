@@ -12,7 +12,8 @@
  * 0.0** with `QEasingCurve::InCubic` during `mBlinkDuration`, which is an IDE SETTING
  * (`core/settings/manager.cpp:73` ⇒ default **600 ms**; the color comes from the
  * theme entry `evaluatedCode`, orange in the factory themes). Here the default is
- * **400 ms** by user request and the duration is the `@blinkduration` attribute.
+ * **500 ms** (400 ms in 0.8.4; raised by user request in 0.9.4) and the duration is
+ * the `@blinkduration` attribute.
  *
  * **Headless** and minimal module: only the state and the opacity curve, so
  * duration and curve can be pinned in a test table (`tests/blink_test.cpp`) without
@@ -31,10 +32,10 @@ namespace sc_code {
 
 class Blink {
   public:
-	static constexpr double kDefaultDuration = 400.; /* ms (the IDE uses 600) */
+	static constexpr double kDefaultDuration = 500.; /* ms (the IDE uses 600) */
 	static constexpr double kMinDuration = 50.;      /* a 0 ms blink cannot be seen */
 	static constexpr double kMaxDuration = 5000.;
-	static constexpr double kStep = 25.; /* ms between repaints (≈16 frames in 400) */
+	static constexpr double kStep = 25.; /* ms between repaints (≈20 frames in 500) */
 
 	/* Starts the blink of the range [start, end) (byte offsets of the buffer). */
 	void start(int start, int end, double now_ms);
