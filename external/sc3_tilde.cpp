@@ -55,7 +55,7 @@
 
 #include "Sc3Engine.h"
 
-#define SC3_TILDE_VERSION "0.15.0"
+#define SC3_TILDE_VERSION "0.15.1"
 
 /* Local gain ramp (anti-click). 8 ms is inaudible as a fade and is enough for
    the cut not to be heard. SC's stop is queued AFTER the ramp reached
@@ -80,7 +80,12 @@ typedef struct _sc3 {
 	void *pump_clock;    /* 3.3: advances the World with DSP off (main thread) */
 	int pump_running;    /* pump_clock is scheduled (avoids duplicate ticks) */
 	int pending_stop;    /* 0 = none, 1 = panic, 2 = hardstop, 3 = freeall */
-	bool opened;         /* open() emitted and engine retained */
+	/* bug #26: this instance is an OWNER of the process-wide World (opened, or
+	   auto-attached by eval/panic). The audio thread reads it (`sc3_perform64`): an
+	   instance that never attached and one that was `close`d must stay silent, so
+	   `info` (engine=off) and the outlets cannot disagree. Atomic because of that
+	   read; main is the only writer. */
+	std::atomic<int> opened;
 	int boot_seen;       /* last boot state reported (3.1: 0 off/1 booting/2 ready/3 failed) */
 	int console_on;      /* mirror the engine text to Max's console (PER INSTANCE) */
 	/* 3.8: audio input. `ins` = signal inlets (can only be set at creation,
@@ -383,7 +388,15 @@ static void sc3_report_status(t_sc3 *x)
 {
 	Sc3Engine &eng = Sc3Engine::instance();
 	if (!x->opened) {
-		sc3_note(x, "sc3~ v%s engine=off (send `open`)", SC3_TILDE_VERSION);
+		/* The World is per process: "this instance did not attach" and "nothing is
+		   running" are different states and `info` must not hide the first one. */
+		Sc3EngineStatus st = eng.status();
+		if (st.ready || st.booting)
+			sc3_note(x, "sc3~ v%s engine=%s (shared World) — this instance is NOT "
+			            "attached: send `open` (any `eval`/`panic` attaches it too)",
+			         SC3_TILDE_VERSION, eng.stateName());
+		else
+			sc3_note(x, "sc3~ v%s engine=off (send `open`)", SC3_TILDE_VERSION);
 		return;
 	}
 	Sc3EngineStatus st = eng.status();
@@ -456,25 +469,50 @@ static void sc3_report_status(t_sc3 *x)
 
 /* ------------------------------------------------------------------ mensajes */
 
+/* bug #26: attach THIS object to a World that is already up. It is `open` without a
+   boot — the World/sclang are process-wide, so there is nothing to start — but the
+   owner registration is what keeps `info`, `close` (only this instance stops
+   listening) and the refcount honest: without it the object rendered and evaluated
+   as a non-owner, the first `close` of another instance tore the World down under it
+   and `panic` was refused. Returns false only if the engine rejected the owner. */
+static bool sc3_attach_existing(t_sc3 *x, const char *why)
+{
+	Sc3Engine &eng = Sc3Engine::instance();
+	Sc3EngineConfig cfg;
+	sc3_engine_config(x, cfg);
+	if (!eng.open(cfg, x))
+		return false;
+	x->opened = true;
+	x->boot_seen = eng.isReady() ? 2 : 1;
+	sc3_pump_start(x); // 3.3: with DSP off the World still advances
+	sc3_note(x, "%s: attached to the running World (%s) — buses %ld..%ld, no new boot",
+	         why, eng.stateName(), x->busoff, x->busoff + x->nchan - 1);
+	return true;
+}
+
 /* The engine is a process-wide singleton: this object's `opened` flag is only a
    cache of it. When they disagree — a boot cancelled by another instance's
    `close`, a patch that was closed from elsewhere, a World that failed after the
    boot — an `eval` used to be queued forever with NOTHING said, which is exactly
    what "the object stopped answering" looks like (bug #23). Syncing the flag here
    is also what makes the next `open` boot again instead of answering "already
-   open". */
+   open". bug #26: with the World already up the sync goes the other way — the
+   object ATTACHES instead of failing (sc3~ never booted twice). */
 static bool sc3_require_engine(t_sc3 *x, const char *what)
 {
 	Sc3Engine &eng = Sc3Engine::instance();
-	if (eng.isReady() || eng.isBooting())
+	const bool up = eng.isReady() || eng.isBooting();
+	if (x->opened && up)
 		return true;
-	if (x->opened) {
-		x->opened = false;
-		object_error((t_object *)x, "%s: the engine is %s (not open) — send `open`", what,
-		             eng.stateName());
-	} else {
+	if (!x->opened) {
+		if (up)
+			return sc3_attach_existing(x, what);
 		object_error((t_object *)x, "%s: send `open` first", what);
+		return false;
 	}
+	x->opened = false;
+	object_error((t_object *)x, "%s: the engine is %s (not open) — send `open`", what,
+	             eng.stateName());
 	return false;
 }
 
@@ -492,6 +530,19 @@ static void sc3_open(t_sc3 *x)
 		sc3_note(x, "open: already open (idempotent)");
 		return;
 	}
+	/* bug #26: the World is shared, so with it already up `open` means ATTACH, not
+	   boot. Nothing is restarted and the instance is usable immediately. */
+	if (engine.isReady() || engine.isBooting()) {
+		if (!sc3_attach_existing(x, "open")) {
+			Sc3EngineStatus st = engine.status();
+			std::string err = st.error.empty() ? "open failed" : st.error;
+			sc3_emit(x, x->out_err, "error", err.c_str());
+			object_error((t_object *)x, "sc3~: %s", err.c_str());
+			return;
+		}
+		sc3_report_status(x);
+		return;
+	}
 	Sc3EngineConfig cfg;
 	sc3_engine_config(x, cfg);
 
@@ -507,13 +558,7 @@ static void sc3_open(t_sc3 *x)
 	x->opened = true;
 	x->boot_seen = 1;
 	sc3_pump_start(x); // 3.3: with DSP off the World still advances
-	if (Sc3Engine::instance().isReady()) {
-		// second object with the engine already up: report right away
-		sc3_report_status(x);
-		x->boot_seen = 2;
-	} else {
-		sc3_note(x, "open: booting in the background (sclang + World) — the UI is not blocked");
-	}
+	sc3_note(x, "open: booting in the background (sclang + World) — the UI is not blocked");
 }
 
 static void sc3_close(t_sc3 *x)
@@ -756,10 +801,10 @@ static void sc3_evalfile(t_sc3 *x, t_symbol *s)
    jump is audible again (measured: click even with the fade). */
 static void sc3_request_stop(t_sc3 *x, int kind)
 {
-	if (!x->opened) {
-		object_error((t_object *)x, "panic/hardstop/freeall: send `open` first");
+	/* bug #26: same rule as eval — if the World is up, attach; if not, this is a
+	   real "nothing to stop", not a silent refusal. */
+	if (!sc3_require_engine(x, "panic/hardstop/freeall"))
 		return;
-	}
 	x->gain_target.store(0.0f);
 	x->pending_stop = kind;
 	clock_delay(x->stop_clock, kStopDelayMs);
@@ -928,6 +973,17 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 {
 	(void)dsp64; (void)flags; (void)userparam;
 
+	/* bug #26: `eng.isReady()` is about the SHARED World, not about this object.
+	   An instance that never attached (no `open`/eval/panic) or that was `close`d
+	   must not listen: it reads buses that another instance's code may be writing,
+	   so without this the object played while `info` said engine=off. Silence here
+	   is also what makes `close` mean "stop listening on this instance" (help). */
+	if (!x->opened.load(std::memory_order_relaxed)) {
+		for (long i = 0; i < numouts; i++)
+			if (outs[i])
+				memset(outs[i], 0, (size_t)sampleframes * sizeof(double));
+		return;
+	}
 	/* 3.8: the input is pushed BEFORE asking for the output window. The World
 	   block rendered in this tick (if anything is left to render) has to see the
 	   samples that just came in through the inlets; the decoupling between the host

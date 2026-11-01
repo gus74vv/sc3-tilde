@@ -6,7 +6,7 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.15.0 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc3~` | 0.15.1 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
 | `sc_code` | 0.9.3 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
@@ -70,6 +70,11 @@ Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 |---|---|
 | `sc3~ n` | `n` output channels (default 2, max 16), served buses `0 … n-1` |
 | `sc3~ n bus` | `n` output channels, served buses `bus … bus+n-1` (lets two instances coexist) |
+
+Several `sc3~` in one patch share **one** engine (one boot, one clock, one socket): the
+second one does not boot again, it *attaches* — send it `open` (instant here) or just
+evaluate from it, which attaches it. An instance that is not attached is silent, even
+when another one is running.
 
 The code evaluated in the object gets `~sc3out` (its base bus) and `~sc3n` (its channel
 count) injected in the top environment, so `Ndef(...).play` and friends land on the right
