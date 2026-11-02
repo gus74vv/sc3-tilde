@@ -15,10 +15,12 @@ namespace sc_code {
 
 const char *const kIndexEndMarker = "#end";
 const char *const kIndexSuperPrefix = "@super ";
+const char *const kIndexVersionPrefix = "@version ";
 
 void ClassIndex::clear() {
 	mMap.clear();
 	mSuper.clear();
+	mVersion.clear();
 	mLineCount = 0;
 }
 
@@ -52,6 +54,7 @@ bool ClassIndex::load(const std::string &text) {
 
 	std::map<std::string, MethodSig> parsed;
 	std::map<std::string, std::string> supers;
+	std::string version;
 	std::string lastNonEmpty;
 	int lineCount = 0;
 	size_t pos = 0;
@@ -71,6 +74,15 @@ bool ClassIndex::load(const std::string &text) {
 		lastNonEmpty = line;
 		if (line == kIndexEndMarker)
 			continue;
+
+		/* Header record: the sclang version that wrote the dump. */
+		const std::string kVersion = kIndexVersionPrefix;
+		if (line.compare(0, kVersion.size(), kVersion) == 0) {
+			version = line.substr(kVersion.size());
+			while (!version.empty() && version[version.size() - 1] == ' ')
+				version.erase(version.size() - 1);
+			continue;
+		}
 
 		/* Inheritance record: `@super <Class> <Superclass>`. */
 		const std::string kSuper = kIndexSuperPrefix;
@@ -108,6 +120,7 @@ bool ClassIndex::load(const std::string &text) {
 
 	mMap.swap(parsed);
 	mSuper.swap(supers);
+	mVersion.swap(version);
 	mLineCount = lineCount;
 	return true;
 }
@@ -175,6 +188,7 @@ var out = File(path, "w");
 if (out.isNil or: { out.isOpen.not }) {
 	("sc_code index: cannot write " ++ path).postln;
 } {
+	out.write("@version " ++ Main.version ++ "\n");
 	Class.allClasses.do { |cls|
 		var sup = cls.superclass;
 		if (sup.notNil) { out.write("@super " ++ cls.asString ++ " " ++ sup.asString ++ "\n") };

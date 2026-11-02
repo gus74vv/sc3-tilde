@@ -13,6 +13,8 @@
  *   - instance methods come as `<Class>.<method>`, class methods as
  *     `Meta_<Class>.<method>`: the `Meta_` prefix is stripped HERE, so `SinOsc.ar`
  *     is queried like any call the user types and the sclang side stays dumb;
+ *   - `@version <3.14.1>` says which sclang wrote the dump (informative: after an
+ *     upgrade the index is stale and has to be regenerated);
  *   - `@super <Class> <Superclass>` records the inheritance chain. `Class.methods`
  *     only returns what the class defines itself, and a lot of what people call is
  *     inherited (`SinOsc.play` lives in `Object`), so without this the bar would be
@@ -50,6 +52,10 @@ namespace sc_code {
 extern const char *const kIndexEndMarker;
 /* Prefix of an inheritance record: `@super <Class> <Superclass>`. */
 extern const char *const kIndexSuperPrefix;
+/* Prefix of the header record with the sclang version that wrote the dump:
+ * `@version <3.14.1>`. Informative only: the editor cannot compare it with the
+ * running engine, but it explains a stale index after upgrading SC. */
+extern const char *const kIndexVersionPrefix;
 
 struct MethodSig {
 	std::string owner;             /* owner class, `Meta_` already stripped */
@@ -76,6 +82,9 @@ class ClassIndex {
 	/* Classes + unique method names, sorted alphabetically. */
 	std::vector<std::string> symbol_names() const;
 
+	/* sclang version that wrote the dump ("" if the record is missing). */
+	std::string version() const { return mVersion; }
+
 	int entries() const { return (int)mMap.size(); }
 	int super_entries() const { return (int)mSuper.size(); }
 	/* Valid entries seen in the last `load()` (superclass records not included). */
@@ -84,6 +93,7 @@ class ClassIndex {
   private:
 	std::map<std::string, MethodSig> mMap;   /* key: "Class.method" */
 	std::map<std::string, std::string> mSuper; /* child -> parent */
+	std::string mVersion;
 	int mLineCount = 0;
 };
 

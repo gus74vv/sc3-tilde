@@ -37,6 +37,7 @@
 #include "jgraphics.h"
 
 #include <chrono>
+#include <dlfcn.h> /* dladdr: the Library dir of the loaded bundle (S6c) */
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -371,6 +372,32 @@ static std::string sc_code_expand_path(const char *path) {
 	return p;
 }
 
+/* S6c: the index is a cache of the INSTALLATION (sclang version + Quarks), not of the
+ * patch, so it lives in ONE file shared by every sc_code of the machine. The default is
+ * derived from where the bundle was loaded from: the .mxo sits in …/<Max>/Library, so
+ * …/Library/sc_code-index.txt needs no hardcoded Max version and follows the user if
+ * they move the folder. The fallback is the documented install location. */
+static std::string sc_code_default_index_path(void) {
+	Dl_info info;
+	if (dladdr((const void *)&sc_code_default_index_path, &info) != 0 && info.dli_fname) {
+		std::string p(info.dli_fname); /* …/Library/sc_code.mxo/Contents/MacOS/sc_code */
+		const size_t mxo = p.find(".mxo/");
+		if (mxo != std::string::npos)
+			return p.substr(0, mxo) + "-index.txt";
+	}
+	if (const char *home = getenv("HOME"))
+		return std::string(home) + "/Documents/Max 9/Library/sc_code-index.txt";
+	return std::string();
+}
+
+/* @indexfile overrides the shared default (another SC installation, or a dump kept
+ * somewhere else). */
+static std::string sc_code_index_path(t_sc_code *x) {
+	if (x->indexfile && x->indexfile->s_name && x->indexfile->s_name[0])
+		return sc_code_expand_path(x->indexfile->s_name);
+	return sc_code_default_index_path();
+}
+
 /* mtime + size: the hot-reload triggers if either of them changed. */
 static bool sc_code_file_stamp(const std::string &path, long *mtime, long long *size) {
 	struct stat st;
@@ -539,14 +566,15 @@ static void sc_code_index_msg(t_sc_code *x, t_symbol *s, long argc, t_atom *argv
 				path += ' ';
 			path += sym ? sym->s_name : "";
 		}
-	} else if (x->indexfile && x->indexfile->s_name) {
-		path = x->indexfile->s_name;
+	} else {
+		path = sc_code_index_path(x);
 	}
 	if (path.empty()) {
-		object_error((t_object *)x, "index: no path — set @indexfile <path>");
+		object_error((t_object *)x, "index: cannot resolve the path (set @indexfile <path>)");
 		return;
 	}
-	const std::string code = sc_code::index_generator_code(sc_code_expand_path(path.c_str()));
+	object_post((t_object *)x, "index: writing %s (one file shared by every sc_code)", path.c_str());
+	const std::string code = sc_code::index_generator_code(path);
 	t_atom a;
 	atom_setsym(&a, gensym(code.c_str()));
 	outlet_anything(x->out_eval, gensym("eval"), 1, &a);
@@ -833,8 +861,9 @@ C74_EXPORT void ext_main(void *r) {
 	/* Same name as a direct message through the inlet (see sc_code_snippets_msg). */
 	class_addmethod(c, (method)sc_code_snippets_msg, "snippets", A_GIMME, 0);
 
-	/* S6c: where sclang writes the class library index (§10.1). The path is saved with
-	 * the patch (the index itself is not: it is a cache, regenerated with 'index'). */
+	/* S6c: where sclang writes the class library index (§10.1). By default it is ONE file
+	 * per installation (…/Max 9/Library/sc_code-index.txt, derived from the bundle path);
+	 * this attribute only OVERRIDES it, and it is saved with the patch. */
 	CLASS_ATTR_SYM(c, "indexfile", 0, t_sc_code, indexfile);
 	CLASS_ATTR_SAVE(c, "indexfile", 0);
 	/* 'index' / 'index <path>': emits the generator through the eval outlet. */
