@@ -1592,7 +1592,10 @@ static bool sc_code_arg_label(t_sc_code *x) {
 		cc.method.empty() ? x->index->find_direct(cc.owner, method) : x->index->find(cc.owner, method);
 	if (!sig || cc.arg >= (int)sig->args.size())
 		return false;
-	return x->buf->insert_text(sig->args[(size_t)cc.arg] + ": ");
+	/* A space after the comma when the user went straight from `,` to Tab (`440,` ⇒
+	 * `440, phase: `); if a space is already there it is not doubled. */
+	const bool after_comma = caret > 0 && text[(size_t)caret - 1] == ',';
+	return x->buf->insert_text((after_comma ? " " : "") + sig->args[(size_t)cc.arg] + ": ");
 }
 
 /* S6c: height of the RESERVED bar. 0 with `@callaid 0` (the text gets the whole box
