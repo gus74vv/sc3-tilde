@@ -50,6 +50,7 @@
 #include "sc_clipboard.h"
 #include "sc_filedialog.h"
 #include "sc_highlight.h"
+#include "sc_index.h"
 #include "sc_indent.h"
 #include "sc_path.h"
 #include "sc_region.h"
@@ -165,6 +166,9 @@ typedef struct _sc_code {
 	/* --- S6: snippets (`snip.KEY` ⇒ the body of the file) ---------------- */
 	t_symbol *snipfile;         /* @snippets: path of the snippets file */
 	ScSnipState *snips;         /* dict parseado + stamp del hot-reload */
+
+	/* --- S6c: index of the class library ('index', SCODE.md §10.1) -------- */
+	t_symbol *indexfile;        /* @indexfile: the file sclang writes the dump to */
 
 	/* --- 0.9.1: wheel / trackpad speed ------------------------------------ */
 	double scrollspeed;         /* @scrollspeed: px per delta unit (default 3.) */
@@ -514,6 +518,40 @@ static void sc_code_snippets_msg(t_sc_code *x, t_symbol *s, long argc, t_atom *a
 	sc_code_set_snippets(x, NULL, argc, argv);
 }
 
+/**********************************************************************/
+/* S6c: index of the class library ('index' message, SCODE.md §10.1)    */
+/* sc_code never talks to the engine, so the answer travels through a file: this
+ * message only EMITS the generator through the 'eval' outlet (it is one expression
+ * => one 'eval') and sclang writes the dump. The bar picks the file up later
+ * (§10.2), so nothing here waits for it.
+ * Nothing is generated on its own: emitting code the user did not write is exactly
+ * what was ruled out. 'index <path>' overrides @indexfile for one shot. */
+
+static void sc_code_index_msg(t_sc_code *x, t_symbol *s, long argc, t_atom *argv) {
+	(void)s;
+	std::string path;
+	if (argc > 0) {
+		/* A message box splits the text on spaces: join them back (same lesson as
+		 * @snippets, 0.9.0). */
+		for (long i = 0; i < argc; ++i) {
+			t_symbol *sym = atom_getsym(argv + i);
+			if (i)
+				path += ' ';
+			path += sym ? sym->s_name : "";
+		}
+	} else if (x->indexfile && x->indexfile->s_name) {
+		path = x->indexfile->s_name;
+	}
+	if (path.empty()) {
+		object_error((t_object *)x, "index: no path — set @indexfile <path>");
+		return;
+	}
+	const std::string code = sc_code::index_generator_code(sc_code_expand_path(path.c_str()));
+	t_atom a;
+	atom_setsym(&a, gensym(code.c_str()));
+	outlet_anything(x->out_eval, gensym("eval"), 1, &a);
+}
+
 /* `jsave`: the TEXT is not an attribute (it is the document state) ⇒ it goes into
  * the patch dictionary. The caret and the scroll are saved with it so that
  * reopening the patch leaves the editor where it was.
@@ -795,6 +833,13 @@ C74_EXPORT void ext_main(void *r) {
 	/* Same name as a direct message through the inlet (see sc_code_snippets_msg). */
 	class_addmethod(c, (method)sc_code_snippets_msg, "snippets", A_GIMME, 0);
 
+	/* S6c: where sclang writes the class library index (§10.1). The path is saved with
+	 * the patch (the index itself is not: it is a cache, regenerated with 'index'). */
+	CLASS_ATTR_SYM(c, "indexfile", 0, t_sc_code, indexfile);
+	CLASS_ATTR_SAVE(c, "indexfile", 0);
+	/* 'index' / 'index <path>': emits the generator through the eval outlet. */
+	class_addmethod(c, (method)sc_code_index_msg, "index", A_GIMME, 0);
+
 	/* --- S5b: colors (RGBA, saved with the patch) --------------------------- */
 	CLASS_ATTR_RGBA(c, "bgcolor", 0, t_sc_code, bgcolor);
 	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "bgcolor", 0, "0.105 0.110 0.130 1.");
@@ -922,6 +967,7 @@ static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv) {
 	x->filename = NULL;
 	x->snipfile = NULL;
 	x->snips = new ScSnipState(); /* S6: empty dict until `@snippets` */
+	x->indexfile = NULL;          /* S6c: no index until `@indexfile` */
 	x->gutter_w = 0.;
 	x->autowrite_clock = clock_new(x, (method)sc_code_autowrite_tick);
 	x->titlebar = 1;

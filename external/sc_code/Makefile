@@ -23,15 +23,15 @@ ARCHFLAGS := -arch $(SC_CODE_ARCH) -mmacosx-version-min=$(SC_CODE_MINOS)
 B := build
 
 CORE_SRC := sc_lexer.cpp sc_region.cpp sc_buffer.cpp sc_indent.cpp sc_scroll.cpp sc_highlight.cpp \
-            sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp
+            sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp sc_index.cpp
 CORE_HDR := sc_lexer.h sc_region.h sc_buffer.h sc_indent.h sc_scroll.h sc_highlight.h sc_bracket.h \
-            sc_wrap.h sc_blink.h sc_snip.h sc_path.h
+            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h
 # Pure C++ for the tests; the clipboard (ObjC++) only goes into the bundle.
 UI_SRC := sc_code.cpp sc_clipboard.mm sc_filedialog.mm
 UI_HDR := sc_code.cpp sc_clipboard.h sc_filedialog.h
 
-.PHONY: all test spike install-spike bundle install install-help smoke testpatch clean uninstall uninstall-spike \
-        snapshot install-stable
+.PHONY: all index-real test spike install-spike bundle install install-help smoke testpatch clean uninstall uninstall-spike \
+        snapshot install-stable index-real
 
 all: test
 
@@ -46,7 +46,7 @@ $(B)/region_test: tests/region_test.cpp $(CORE_SRC) $(CORE_HDR)
 
 test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/scroll_test \
       $(B)/highlight_test $(B)/bracket_test $(B)/wrap_test $(B)/blink_test $(B)/snip_test \
-      $(B)/path_test
+      $(B)/path_test $(B)/index_test
 	./$(B)/lexer_test
 	./$(B)/region_test
 	./$(B)/buffer_test
@@ -58,6 +58,28 @@ test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/sc
 	./$(B)/blink_test
 	./$(B)/snip_test
 	./$(B)/path_test
+	./$(B)/index_test
+
+# S6c: class library index (parse + query + sclang generator) — pure C++, no Max.
+$(B)/index_test: tests/index_test.cpp sc_index.cpp sc_index.h
+	@mkdir -p $(B)
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/index_test.cpp sc_index.cpp -o $@
+
+# S6c §10.5: write a REAL dump with sclang and check the parser on it (~32k entries).
+# sclang does not exit after running a file (it stays as a REPL), so the dump is
+# polled for its #end marker and the process is killed: the file is the gate.
+SCLANG ?= /Applications/SuperCollider.app/Contents/MacOS/sclang
+INDEX  ?= /tmp/sc_code-index.txt
+index-real: $(B)/index_test
+	./$(B)/index_test --generator "$(INDEX)" > $(B)/index_gen.scd
+	@rm -f "$(INDEX)"
+	@"$(SCLANG)" $(B)/index_gen.scd < /dev/null > $(B)/index_gen.log 2>&1 & \
+	  pid=$$!; for i in $$(seq 1 160); do \
+	    if [ -s "$(INDEX)" ] && [ "$$(tail -1 "$(INDEX)")" = "#end" ]; then break; fi; \
+	    sleep 0.25; \
+	  done; kill $$pid 2>/dev/null; wait $$pid 2>/dev/null; true
+	@grep "sc_code index" $(B)/index_gen.log || echo "index: sclang wrote nothing (see $(B)/index_gen.log)"
+	./$(B)/index_test -v "$(INDEX)"
 
 # S7 (0.9.5): drop-path formatting — pure strings, no Max (SCODE.md §12).
 $(B)/path_test: tests/path_test.cpp sc_path.cpp sc_path.h
