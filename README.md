@@ -71,6 +71,38 @@ including the one-time `index` message.
 > the SC side only. If you already hit it, bring the scheduler back with Max's
 > `Resume`.
 
+## How it works
+
+| thread | owns | does |
+|---|---|---|
+| Max audio (`perform`) | the SuperCollider `World` | drain OSC → `PerformOSC*` → `World_Run` → copy its buses to the DSP chain |
+| engine worker | the sclang VM | boot, `eval`, `tick()` (AppClock), collect the posts |
+| Max main | nothing of the engine | enqueue work, deliver the outlets |
+
+* **One process, one engine.** `scsynth` and `sclang` are linked statically into the
+  bundle, so there is no helper app behind the object. The `World` is created headless
+  (`mRealTime = false`, no audio driver — the mode SuperCollider itself uses for offline
+  renders) and it is `sc3~` who calls `World_Run` from the audio thread and copies its
+  output buses into the DSP chain: SC's graph becomes ordinary Max signals.
+* **OSC over loopback.** The embedded sclang still talks to the `World` with OSC, over
+  loopback UDP through the engine's own socket — `World_OpenUDP` is unusable without a
+  driver, it drops the datagram — with a reply address that answers back. Bundles that
+  carry a timetag are queued and cleared by `/clearSched`. The `World` binds first (port
+  `0` lets the kernel pick one, `@port N` forces it) and hands the real port to sclang
+  before its library is compiled, which is why the SC IDE can stay open.
+* **Sample rate.** The `World` is born at the DSP chain's rate (`sys_getsr`, which is
+  valid with DSP off) and the sclang side is aligned to it during the boot, so
+  `s.sampleRate` tells the truth. Changing the project rate with the patch open is
+  reported, not followed live: `close` then `open` recreates the `World`.
+* **One `World` per process.** A second `sc3~` does not boot again, it *attaches*: each
+  instance reads its own range of the single 64-bus pool from the same stream (the engine
+  renders whatever is missing and the others read those same samples), so two instances
+  cost one clock and one socket.
+* **No Qt.** Text, warnings and `post` are captured through the public embedding API
+  (`SC_LanguageClient`). The class library is the installed one; a small Qt-free module is
+  added to its include path at boot, so `s.boot` / `s.quit` are no-ops, a bare `.play`
+  lands on the instance's buses and `Server.default` points at the engine.
+
 ## `sc3~` reference
 
 ### Arguments
