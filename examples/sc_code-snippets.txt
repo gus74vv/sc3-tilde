@@ -1,0 +1,83 @@
+# sc_code snippets -- example file shipped with sc3~/sc_code.
+#
+# Format: every block starts with a line `### <key>` (letters, digits and `_` only);
+# the body is everything up to the next `### <key>` header, VERBATIM (no escapes,
+# no preprocessing). Text before the first header is ignored.
+#
+# Use it: send `snippets <path to this file>` to the [sc_code] inlet (or set the
+# @snippets attribute in the inspector; the path is saved with the patch). Then type
+# `snip.<key>` in the editor and press Cmd+Return: the text is REPLACED by the body
+# (one undo step) and nothing is evaluated -- the next Cmd+Return evaluates it.
+
+
+### 1
+(
+Ndef(\a, {
+	var l=LocalIn.ar+
+	Decay2.ar(
+		Impulse.ar(3),
+		3e-2,
+		0.05,
+		LFCub.ar(
+			LFNoise2.kr(19,500,600)));
+	l=DelayN.ar(l,1,1/2);
+	LocalOut.ar(l/3);
+	l!2
+} * -20.dbamp
+).clock_(t).quant_(1).fadeTime_(6).play;
+)
+Ndef(\a).clear(10)
+
+### 2
+(
+Ndef(\b, {
+	var k;
+	Splay.ar(
+		Integrator.ar(
+			LFNoise0.ar(
+				5!3,
+				k=Duty.ar(
+					6.4,
+					0,
+					Dseq([0.05,Drand([0.04,0.08],1)],inf)
+				)
+			).round(k/10)
+		).sin.sqrt.tanh,
+		0.3
+	)
+} * -20.dbamp
+).clock_(t).quant_(1).fadeTime_(6).play
+)
+Ndef(\b).clear(10)
+
+### 3
+(
+Ndef(\c, {
+	var f={rrand(0.2, 2.0)};
+	Splay.ar(
+		SinOsc.ar(
+			SinOsc.ar(0.02*(f!8)).sum.round(f!8)*
+			(f!8+1)*100
+		)
+	)*0.1
+} * -20.dbamp
+).clock_(t).quant_(1).fadeTime_(10).play;
+)
+Ndef(\c).clear(10)
+
+### 4
+(
+Ndef(\d,{
+	{
+		{|i|
+			SinOsc.ar(
+				20+(i*LFNoise2.ar(1).range(3,10)),
+				pi.rand,
+				SinOsc.ar(2.2.rand).range(0.001,0.1)
+			)
+		}.sum(200)
+	}!2
+} * -20.dbamp
+).clock_(t).quant_(1).fadeTime_(10).play;
+)
+Ndef(\d).clear(10)

@@ -192,6 +192,15 @@ the body (caret at the end, a single undo step) and **nothing is evaluated** —
 `⌘Return` evaluates the expanded text. A trailing `;` is allowed. Unknown key: the buffer
 is left untouched and Max's console lists the keys that are available.
 
+The release ships a working example: `examples/sc_code-snippets.txt`, four `Ndef`s (`\a`
+… `\d`, keys `1` … `4`) taken from the author's own collection. Their `.clock_(t)`
+points at the one-letter interpreter variable `t`, nil unless you assign it — and a nil
+clock means `TempoClock.default` (NodeProxy: `clock ? TempoClock.default`), so nothing
+has to be set up first. Each body ends with `Ndef(\a).clear(10)`, so evaluating the
+**whole** body plays it and releases it ten seconds later: select just the `( … )` block
+to keep it running. Load it with `snippets <path to the file>` and try `snip.1` …
+`snip.4`.
+
 ## Known limits
 
 * **No GUI in the engine.** There is no Qt: `plot`, `Window`, and any code that tries to
