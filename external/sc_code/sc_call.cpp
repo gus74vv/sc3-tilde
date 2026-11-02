@@ -161,8 +161,65 @@ CallContext call_context_at(const std::string &text, int caret) {
 			break;
 		}
 	}
-	if (p < 0)
+	if (p < 0) {
+		/* --- (2) no call: the caret is ON a name ---------------------------------
+		 * Clicking `Duty.kr` in the document has to show the same signature as typing
+		 * `Duty.kr(` (SCODE.md §10.2: the bar is also the help of what is already
+		 * written). `arg` stays -1: there is no "current argument" without parentheses.
+		 * Inside a string/symbol/comment nothing is a name. */
+		if (state != StateCode)
+			return out;
+		int a = caret, b = caret;
+		while (a > 0 && is_ident_char(text[(size_t)a - 1]))
+			--a;
+		while (b < len && is_ident_char(text[(size_t)b]))
+			++b;
+		if (a == b)
+			return out;
+		int os = a, oe = a, ms = a, me = b;
+		int k = a - 1;
+		while (k >= 0 && is_blank(text[(size_t)k]))
+			--k;
+		if (k >= 0 && text[(size_t)k] == '.') {
+			/* the caret is on the METHOD: the owner is to the left */
+			--k;
+			while (k >= 0 && is_blank(text[(size_t)k]))
+				--k;
+			oe = k + 1;
+			while (k >= 0 && is_ident_char(text[(size_t)k]))
+				--k;
+			os = k + 1;
+		} else {
+			/* the caret may be on the OWNER: `Duty|.kr` */
+			ms = a;
+			me = b;
+			k = b;
+			while (k < len && is_blank(text[(size_t)k]))
+				++k;
+			if (k >= len || text[(size_t)k] != '.')
+				return out;
+			++k;
+			while (k < len && is_blank(text[(size_t)k]))
+				++k;
+			os = a;
+			oe = b;
+			ms = k;
+			while (k < len && is_ident_char(text[(size_t)k]))
+				++k;
+			me = k;
+		}
+		if (os >= oe || ms >= me)
+			return out;
+		const char first0 = text[(size_t)os];
+		if (!(first0 >= 'A' && first0 <= 'Z'))
+			return out; /* same rule: only an uppercase (class) receiver resolves */
+		out.valid = true;
+		out.owner = text.substr((size_t)os, (size_t)(oe - os));
+		out.method = text.substr((size_t)ms, (size_t)(me - ms));
+		out.open_paren = -1;
+		out.arg = -1;
 		return out;
+	}
 
 	/* Receiver and method: `Class . method` to the left of the '('. */
 	int i = p - 1;
@@ -176,8 +233,20 @@ CallContext call_context_at(const std::string &text, int caret) {
 		return out;
 	while (i >= 0 && is_blank(text[(size_t)i]))
 		--i;
-	if (i < 0 || text[(size_t)i] != '.')
+	if (i < 0 || text[(size_t)i] != '.') {
+		/* No receiver: `Ndef(` is a BARE CLASS CONSTRUCTOR. Only if it looks like a class
+		 * (uppercase first letter); `method` comes back EMPTY and whoever has the index
+		 * resolves it to `Class.new` (`Ndef.new(key, object)`). Nothing is guessed here:
+		 * a lowercase name is still a plain function call and has no signature. */
+		const char c0 = text[(size_t)mStart];
+		if (!(c0 >= 'A' && c0 <= 'Z'))
+			return out;
+		out.valid = true;
+		out.owner = text.substr((size_t)mStart, (size_t)(mEnd - mStart));
+		out.method.clear(); /* "" = constructor */
+		out.open_paren = p;
 		return out;
+	}
 	--i;
 	while (i >= 0 && is_blank(text[(size_t)i]))
 		--i;

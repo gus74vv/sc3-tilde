@@ -64,7 +64,10 @@ bool bar_covers(double y, double box_h, double line_h, bool callaid) {
 
 BarCells bar_layout(const BarModel &m, int cells) {
 	BarCells out;
-	out.counter = (m.count > 0) ? std::to_string(m.arg + 1) + "/" + std::to_string(m.count) : std::string();
+	/* The counter only exists when there IS a current argument: `arg` = -1 is "the caret
+	 * is on the name, no parentheses" (sc_call), and `0/4` would be a lie. */
+	out.counter = (m.count > 0 && m.arg >= 0) ? std::to_string(m.arg + 1) + "/" + std::to_string(m.count)
+													 : std::string();
 	if (cells == 0) { /* nothing fits */
 		out.counter.clear();
 		return out;

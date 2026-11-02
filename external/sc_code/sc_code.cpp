@@ -1419,10 +1419,12 @@ static double sc_code_bar_height(t_sc_code *x) {
 	return (double)sc_code::bar_height(x->line_h);
 }
 
-/* What the bar shows: the signature of the call that contains the caret. "No bar"
- * (blank, it is never hidden) when there is no call context, when the method is not in
- * the index, or when `@callaid 0`. The receiver shown is the one the user TYPED and not
- * the class that defines the method: `SinOsc.play` has to read `SinOsc.play(…)` even
+/* What the bar shows: the signature of the call that contains the caret, or the one of
+ * the name the caret is ON (clicking `Duty.kr` in the document shows the same as typing
+ * it), or the constructor of a bare class call (`Ndef(` ⇒ `Ndef.new(key, object)`).
+ * "No bar" (blank, it is never hidden) when there is no context, when the index does not
+ * have the answer, or when `@callaid 0`. The receiver shown is the one the user TYPED and
+ * not the class that defines the method: `SinOsc.play` has to read `SinOsc.play(…)` even
  * though the index found it two levels up in `Object` (sc_index walks the chain). */
 static bool sc_code_bar_model(t_sc_code *x, sc_code::BarModel *out) {
 	*out = sc_code::BarModel();
@@ -1431,10 +1433,14 @@ static bool sc_code_bar_model(t_sc_code *x, sc_code::BarModel *out) {
 	const sc_code::CallContext cc = sc_code::call_context_at(x->buf->text(), x->buf->caret());
 	if (!cc.valid)
 		return false;
-	const sc_code::MethodSig *sig = x->index->find(cc.owner, cc.method);
+	/* Bare constructor: `find_direct` on purpose. If the class does not define its own
+	 * `new`, the honest answer is "nothing" and not the inherited `Object.new(maxSize)`. */
+	const std::string method = cc.method.empty() ? std::string("new") : cc.method;
+	const sc_code::MethodSig *sig =
+		cc.method.empty() ? x->index->find_direct(cc.owner, method) : x->index->find(cc.owner, method);
 	if (!sig)
 		return false;
-	*out = sc_code::bar_model(cc.owner, cc.method, sig->args, cc.arg);
+	*out = sc_code::bar_model(cc.owner, method, sig->args, cc.arg);
 	return true;
 }
 

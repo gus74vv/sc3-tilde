@@ -17,8 +17,8 @@
  *     upgrade the index is stale and has to be regenerated);
  *   - `@super <Class> <Superclass>` records the inheritance chain. `Class.methods`
  *     only returns what the class defines itself, and a lot of what people call is
- *     inherited (`SinOsc.play` lives in `Object`), so without this the bar would be
- *     silent exactly on the common calls;
+ *     inherited (`SinOsc.madd` lives in `UGen`, two levels up), so without this the
+ *     bar would be silent exactly on the common calls;
  *   - the LAST line is `#end`: the file can be half written when the editor looks
  *     at it, and without the marker nothing is accepted (all or nothing).
  *

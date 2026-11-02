@@ -48,14 +48,16 @@ struct BarModel {
 
 /* The model for a signature coming from the index. `arg` may run past `count` (the
  * user typed extra commas): it is clamped to the last argument, which is what the bar
- * shows while the call is wrong anyway. */
+ * shows while the call is wrong anyway. `arg` = -1 means "no current argument" (the
+ * caret is ON the name, there are no parentheses): nothing is highlighted and there is
+ * no `n/N` counter. */
 BarModel bar_model(const std::string &owner, const std::string &method, const std::vector<std::string> &args,
 				   int arg);
 
 struct BarCells {
 	std::string text;     /* left part, already truncated with "…" */
 	int hl_start, hl_end; /* highlighted span, BYTE offsets inside `text`, -1 = none */
-	std::string counter;  /* "2/4", may be empty (no arguments) */
+	std::string counter;  /* "2/4"; empty when there are no arguments OR no current one */
 	int counter_col;      /* cell column where the counter starts, -1 = none */
 	bool arg_visible;     /* the current argument made it on screen */
 	int used;             /* cells taken by `text` (== cells_in(text)) */

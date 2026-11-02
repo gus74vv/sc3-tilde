@@ -8,6 +8,10 @@
  *
  *   `Class.method( ...caret... )`     ← the receiver is an identifier starting with
  *                                       an uppercase letter
+ *   `Class.method`   (caret on it)    ← the same name already written: clicking it in
+ *                                       the document asks for the same signature
+ *   `Class( ...caret... )`            ← a bare constructor: `method` comes back EMPTY
+ *                                       (whoever has the index turns it into `new`)
  *
  * That is the only case that can be resolved WITHOUT type inference: `SinOsc.ar(`,
  * `Env.new(`, `Buffer.read(`. What hangs off a variable (`~x.do(`, `s.boot(`) is not
@@ -18,11 +22,14 @@
  *     `SinOsc.ar(Line.kr(1, 2), caret)` the call is `Line.kr`.
  *   - Strings, symbols ('…'), character literals ($x), line comments and (nested)
  *     block comments do not count: a `(` inside a comment opens nothing and a comma
- *     inside a string does not separate arguments.
+ *     inside a string does not separate arguments. A caret inside any of those is
+ *     not on a name either.
  *   - Argument commas are ONLY the level 0 ones of that parenthesis: the commas of
  *     nested `[1, 2, 3]`, `(…)` or `{…}` do not advance the current argument.
  *   - Caret right after `(` => argument 0; after the 1st comma => 1; and so on.
  *   - If the call already closed (`)` before the caret) there is no context.
+ *   - With no call open, the caret inside or at either edge of `Class.method` gives
+ *     the context of that name, with `arg` = -1 (no current argument).
  *
  *     This program is free software; you can redistribute it and/or modify
  *     it under the terms of the GNU General Public License as published by
@@ -39,10 +46,10 @@ namespace sc_code {
 struct CallContext {
 	bool valid;
 	std::string owner;  /* `SinOsc`, as it was written */
-	std::string method; /* `ar` */
-	int open_paren;     /* offset of the `(` */
+	std::string method; /* `ar`; EMPTY = a bare constructor (`Ndef(` ⇒ `Ndef.new`) */
+	int open_paren;     /* offset of the `(`; -1 = the caret is on the name, no call */
 	int arg;            /* current argument, 0-based (may run past the end if there are
-	                     * extra commas) */
+	                     * extra commas); -1 = unknown / no current argument */
 
 	CallContext() : valid(false), open_paren(-1), arg(0) {}
 };
