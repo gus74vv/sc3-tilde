@@ -36,7 +36,8 @@ at boot with a real error instead of leaving a silent engine.
 
 ## Install
 
-1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the **User Library** (~/Documents/Max 9/Library) is always in the path.
+1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the
+   **User Library** (`~/Documents/Max 9/Library`) is always in the path.
 2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Help`.
 3. **Restart Max** (`.mxo` files are loaded when the app starts).
 
@@ -58,8 +59,8 @@ Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 
 The release also ships **`examples/example.maxpat`**, a self-contained patch: it boots the
 engine, plays a demo from the `sc_code` buffer, shows the `set` path for Synth arguments
-from Max's UI and has a `panic` button (the way that is *not* `⌘.`). Its comments explain
-what to look at, including the one-time `index` message.
+from Max's UI and has a `panic` button (Ctrl+.). Its comments explain what to look at,
+including the one-time `index` message.
 
 > **Warning for SuperCollider users:** do **not** press `⌘.` in Max to kill the sound.
 > In Max that is *stop scheduler*, which halts Max's own scheduler and the whole patch
@@ -239,13 +240,11 @@ the body (caret at the end, a single undo step) and **nothing is evaluated** —
 `⌘Return` evaluates the expanded text. A trailing `;` is allowed. Unknown key: the buffer
 is left untouched and Max's console lists the keys that are available.
 
-The release ships a working example: `examples/sc_code-snippets.txt`, four `Ndef`s (`\a`
-… `\d`, keys `1` … `4`) taken from the author's own collection. Their `.clock_(t)`
-points at the one-letter interpreter variable `t`, nil unless you assign it — and a nil
-clock means `TempoClock.default` (NodeProxy: `clock ? TempoClock.default`), so nothing
-has to be set up first. Each body ends with `Ndef(\a).clear(10)`, so evaluating the
-**whole** body plays it and releases it ten seconds later: select just the `( … )` block
-to keep it running. Load it with `snippets <path to the file>` and try `snip.1` …
+The release ships a working example: `examples/sc_code-snippets.txt`, four `Ndef`s (`\a` …
+`\d`, keys `1` … `4`). Their `.clock_(t)` points at the one-letter interpreter variable
+`t`, nil unless you assign it — and a nil clock means `TempoClock.default` (NodeProxy:
+`clock ? TempoClock.default`), so nothing has to be set up first. Each body ends with
+`Ndef(\a).clear(10)`. Load it with `snippets <path to the file>` and try `snip.1` …
 `snip.4`.
 
 ## Known limits
