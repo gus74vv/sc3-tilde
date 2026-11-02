@@ -9,6 +9,13 @@ name: build
 on:
   push:
     branches: [main]
+    # A docs-only push cannot break the build (these files never reach the compiler), and
+    # a release is not built here: skip the run instead of spending a runner on it.
+    # A push that touches the workflow itself still triggers a run, which is the point.
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - 'examples/**'
   pull_request:
   workflow_dispatch:
 
