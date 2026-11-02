@@ -30,7 +30,7 @@
 				"box": {
 					"id": "obj-1",
 					"maxclass": "comment",
-					"text": "sc_code — in-patch sclang code editor for sc3~  (0.9.6)",
+					"text": "sc_code — in-patch sclang code editor for sc3~  (0.9.7)",
 					"numinlets": 1,
 					"numoutlets": 0,
 					"patching_rect": [

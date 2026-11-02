@@ -62,7 +62,13 @@
 #include "sc_snip.h"
 #include "sc_wrap.h"
 
-/* 0.9.6 (S6c step 2b): the BOTTOM BAR is wired. With `@callaid 1` (default) a line is
+/* 0.9.7 (S6c+): COMPLETION in the bar, AUTOMATIC and display-only. After three letters
+ * of a token (`Sin`) the bar shows the best candidate and `n/N`; `Tab` inserts it (one
+ * undo step), `⇧Tab` cycles, `⏎` is NEVER taken (it still evaluates / breaks the line) and
+ * typing filters until nothing is left. After `Class.` the list is only the methods of
+ * that class. Measured at the gate: neither `⌃Space` nor `⌥Space` reaches `key` on this
+ * keyboard, so the session is not behind a shortcut (the manual toggle stays, unused).
+ * 0.9.6 (S6c step 2b): the BOTTOM BAR is wired. With `@callaid 1` (default) a line is
  * RESERVED at the bottom of the box (`h - bar_height`, so the caret can never hide
  * behind it) and it shows the signature of the call that contains the caret
  * (`SinOsc.ar(` ⇒ `SinOsc.ar(freq, phase, mul, add)`, current argument highlighted,
@@ -97,7 +103,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.6"
+#define SC_CODE_VERSION "0.9.7"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -1462,8 +1468,11 @@ static void sc_code_compl_close(t_sc_code *x) {
 /* Asks the engine for the candidate at `cycle` and keeps the session in sync. Returns
  * false when there is nothing to offer, and then the session CLOSES itself (§10.6: "si
  * queda vacía se cierra sola"). The candidate source only changes with the receiver:
- * `set_external` rebuilds the pool, so it is not done on every keystroke. */
-static bool sc_code_compl_refresh(t_sc_code *x, int cycle) {
+ * `set_external` rebuilds the pool, so it is not done on every keystroke.
+ *
+ * `min_prefix` = 3 on the automatic path (the bar only speaks once there are three
+ * letters: `Sin` suggests, `Si` is noise), 0 for an explicit request. */
+static bool sc_code_compl_refresh(t_sc_code *x, int cycle, int min_prefix) {
 	if (!x->completer || !x->callaid)
 		return false;
 	sc_code_index_refresh(x);
@@ -1491,9 +1500,7 @@ static bool sc_code_compl_refresh(t_sc_code *x, int cycle) {
 	x->completer->sync(text, x->buf->revision());
 
 	sc_code::Completion c;
-	/* min_prefix 0 = the user asked for it: an empty prefix (right after `SinOsc.`) is a
-	 * valid request and lists everything. */
-	if (!x->completer->suggest(text, x->buf->caret(), cycle, 0, c)) {
+	if (!x->completer->suggest(text, x->buf->caret(), cycle, min_prefix, c)) {
 		sc_code_compl_close(x);
 		return false;
 	}
@@ -1506,7 +1513,10 @@ static bool sc_code_compl_refresh(t_sc_code *x, int cycle) {
 	return true;
 }
 
-/* ⌃Space: open (or close) the session at the caret. */
+/* Explicit request (⌃Space): open (or close) the session at the caret with no minimum
+ * prefix, so right after `SinOsc.` the list is complete. Kept as the manual door even
+ * though the automatic path does not need it (02-nov: on this keyboard neither ⌃Space
+ * nor ⌥Space reaches `key`, see SCODE.md §10.6). */
 static void sc_code_compl_toggle(t_sc_code *x) {
 	if (x->compl_open) {
 		sc_code_compl_close(x);
@@ -1516,14 +1526,18 @@ static void sc_code_compl_toggle(t_sc_code *x) {
 		return; /* no bar, no session: there is nowhere to show it */
 	x->compl_cycle = 0;
 	x->compl_receiver.clear(); /* fresh candidate source for this caret */
-	sc_code_compl_refresh(x, 0);
+	sc_code_compl_refresh(x, 0, 0);
 }
+
+/* Threshold of the automatic suggestion: below it the bar stays quiet (`Si` is not a
+ * suggestion). */
+#define SC_COMPL_MIN_PREFIX 3
 
 static void sc_code_compl_cycle_by(t_sc_code *x, int delta) {
 	if (!x->compl_open)
 		return;
 	x->compl_cycle += delta;
-	sc_code_compl_refresh(x, x->compl_cycle);
+	sc_code_compl_refresh(x, x->compl_cycle, SC_COMPL_MIN_PREFIX);
 }
 
 /* ⏎: the candidate replaces the token it was suggesting for. One undo step, like the
@@ -2070,11 +2084,8 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 	switch (keycode) {
 	/* --- evaluation (SCODE.md §1/§3.2) ------------------------------------ */
 	case K_RETURN:
-		/* S6c+: inside the session ⏎ inserts the candidate, it does not evaluate. */
-		if (x->compl_open && !cmd && !ctrl && !alt) {
-			sc_code_compl_accept(x);
-			return 1;
-		}
+		/* S6c+ decision (02-nov): ⏎ is NEVER taken by the session — it keeps evaluating and
+		 * inserting newlines. Only Tab writes the suggestion. */
 		if (cmd && shift) {
 			sc_code_eval_with_mode(x, sc_code::EvalModeDocument); /* agregado nuestro (§7.1) */
 			return 1;
@@ -2197,8 +2208,13 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 
 	/* --- Tab = spaces (§7.1 decision), or cycling inside a session (S6c+) --- */
 	case K_TAB:
+		/* S6c+: with a candidate in the bar, Tab INSERTS it (one undo step) and ⇧Tab
+		 * cycles. Without a candidate, Tab is still indentation (spaces, §7.1). */
 		if (x->compl_open) {
-			sc_code_compl_cycle_by(x, shift ? -1 : 1);
+			if (shift)
+				sc_code_compl_cycle_by(x, -1);
+			else
+				sc_code_compl_accept(x);
 			jbox_redraw(&x->j_box);
 			return 1;
 		}
@@ -2244,10 +2260,10 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		break;
 	}
 
-	/* S6c+: typing inside the session FILTERS it, and when nothing matches any more it
-	 * closes itself (§10.6). */
-	if (x->compl_open && !x->readonly && !cmd && !ctrl && sc_is_printable(textcharacter))
-		sc_code_compl_refresh(x, 0);
+	/* S6c+: the suggestion is AUTOMATIC as soon as the token has 3 letters (`Sin` ⇒
+	 * `SinOsc`) and it only DISPLAYS: nothing is written until Tab says so. */
+	if (!x->readonly && !cmd && !ctrl && sc_is_printable(textcharacter))
+		sc_code_compl_refresh(x, 0, SC_COMPL_MIN_PREFIX);
 
 	/* The caret ALWAYS ends up visible: it is the rule that makes the editor
 	 * usable with documents taller than the box (typing, arrows, ⌘↑/↓,
