@@ -82,6 +82,15 @@ class ClassIndex {
 	/* Classes + unique method names, sorted alphabetically. */
 	std::vector<std::string> symbol_names() const;
 
+	/* Classes only (`@super` records, class side excluded), sorted. Feeds the plain
+	 * completion session of the bar (S6c+, §10.6). */
+	std::vector<std::string> class_names() const;
+
+	/* Method names of `owner` and of its superclass chain, sorted and unique. The class
+	 * side and the instance side are merged on purpose: the text `SinOsc.` does not say
+	 * which one it is, and both are useful while typing. */
+	std::vector<std::string> method_names_of(const std::string &owner) const;
+
 	/* sclang version that wrote the dump ("" if the record is missing). */
 	std::string version() const { return mVersion; }
 

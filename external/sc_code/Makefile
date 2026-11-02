@@ -24,9 +24,9 @@ B := build
 
 CORE_SRC := sc_lexer.cpp sc_region.cpp sc_buffer.cpp sc_indent.cpp sc_scroll.cpp sc_highlight.cpp \
             sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp sc_index.cpp \
-            sc_call.cpp sc_bar.cpp
+            sc_call.cpp sc_bar.cpp sc_complete.cpp
 CORE_HDR := sc_lexer.h sc_region.h sc_buffer.h sc_indent.h sc_scroll.h sc_highlight.h sc_bracket.h \
-            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h sc_call.h sc_bar.h
+            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h sc_call.h sc_bar.h sc_complete.h
 # Pure C++ for the tests; the clipboard (ObjC++) only goes into the bundle.
 UI_SRC := sc_code.cpp sc_clipboard.mm sc_filedialog.mm
 UI_HDR := sc_code.cpp sc_clipboard.h sc_filedialog.h
@@ -47,7 +47,7 @@ $(B)/region_test: tests/region_test.cpp $(CORE_SRC) $(CORE_HDR)
 
 test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/scroll_test \
       $(B)/highlight_test $(B)/bracket_test $(B)/wrap_test $(B)/blink_test $(B)/snip_test \
-      $(B)/path_test $(B)/index_test $(B)/call_test $(B)/bar_test
+      $(B)/path_test $(B)/index_test $(B)/call_test $(B)/bar_test $(B)/complete_test
 	./$(B)/lexer_test
 	./$(B)/region_test
 	./$(B)/buffer_test
@@ -62,6 +62,12 @@ test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/sc
 	./$(B)/index_test
 	./$(B)/call_test
 	./$(B)/bar_test
+	./$(B)/complete_test
+
+# S6c+: candidate engine of the completion session (text + caret -> candidate).
+$(B)/complete_test: tests/complete_test.cpp sc_complete.cpp sc_complete.h
+	@mkdir -p $(B)
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/complete_test.cpp sc_complete.cpp -o $@
 
 # S6c: bottom bar — geometry and text layout in monospace cells — pure C++.
 $(B)/bar_test: tests/bar_test.cpp sc_bar.cpp sc_bar.h

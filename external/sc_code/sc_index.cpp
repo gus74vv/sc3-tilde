@@ -163,6 +163,37 @@ std::vector<std::string> ClassIndex::symbol_names() const {
 	return std::vector<std::string>(unique.begin(), unique.end());
 }
 
+std::vector<std::string> ClassIndex::class_names() const {
+	/* `mSuper` is a std::map: it is already sorted and unique. The class-side records
+	 * (`Meta_X`) are dropped: `Meta_SinOsc` is not something the user writes. */
+	static const std::string kMeta = "Meta_";
+	std::vector<std::string> out;
+	out.reserve(mSuper.size());
+	for (std::map<std::string, std::string>::const_iterator it = mSuper.begin(); it != mSuper.end(); ++it)
+		if (it->first.compare(0, kMeta.size(), kMeta) != 0)
+			out.push_back(it->first);
+	return out;
+}
+
+std::vector<std::string> ClassIndex::method_names_of(const std::string &owner) const {
+	std::set<std::string> unique;
+	std::string cur = owner;
+	for (int hops = 0; hops < 64 && !cur.empty(); ++hops) {
+		const std::string prefix = cur + ".";
+		for (std::map<std::string, MethodSig>::const_iterator it = mMap.lower_bound(prefix);
+			 it != mMap.end(); ++it) {
+			if (it->first.compare(0, prefix.size(), prefix) != 0)
+				break;
+			unique.insert(it->second.name);
+		}
+		const std::string parent = superclass_of(cur);
+		if (parent.empty() || parent == cur)
+			break;
+		cur = parent;
+	}
+	return std::vector<std::string>(unique.begin(), unique.end());
+}
+
 /* --- generator (sclang side) ------------------------------------------------- */
 
 static std::string escape_sc_string(const std::string &path) {

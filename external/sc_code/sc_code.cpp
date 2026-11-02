@@ -49,6 +49,7 @@
 #include "sc_blink.h"
 #include "sc_bracket.h"
 #include "sc_call.h"
+#include "sc_complete.h"
 #include "sc_buffer.h"
 #include "sc_clipboard.h"
 #include "sc_filedialog.h"
@@ -187,11 +188,19 @@ typedef struct _sc_code {
 	long index_warned;          /* the "never generated" notice goes once per object */
 
 	/* --- S6c step 2b: the bottom bar (§10.2) ------------------------------ */
-	long callaid;               /* 1 = reserved bar with the signature (default 1) */
-	double bar_h;               /* bar height in px (0 = no bar, from sc_code_bar_height) */
+	long callaid;               /* 1 = reserved bar with the signature (default 1) */	double bar_h;               /* bar height in px (0 = no bar, from sc_code_bar_height) */
 	long bar_grab;              /* 1 = the mousedown was on the bar: ignore the drag */
 	t_jrgba barcolor;           /* bar background */
 	t_jrgba barhighlight;       /* color of the current argument */
+
+	/* --- S6c+: completion session (⌃Space, §10.6) ------------------------ */
+	sc_code::Completer *completer; /* candidate engine (headless, sc_complete) */
+	std::string compl_receiver; /* receiver the candidate list came from (cache key) */
+	long compl_open;            /* 1 = the bar is showing candidates, not the signature */
+	int compl_cycle;            /* which alternative (Tab/⇧Tab) */
+	int compl_start, compl_end; /* token that ⏎ replaces (end == caret) */
+	std::string compl_word;     /* candidate that ⏎ inserts */
+	int compl_alternatives;     /* n of `n/N` */
 
 	/* --- 0.9.1: wheel / trackpad speed ------------------------------------ */
 	double scrollspeed;         /* @scrollspeed: px per delta unit (default 3.) */
@@ -1091,6 +1100,11 @@ static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv) {
 	x->index_mtime = 0;
 	x->index_size = -1;
 	x->index_warned = 0;
+	x->completer = new sc_code::Completer();
+	x->compl_open = 0;
+	x->compl_cycle = 0;
+	x->compl_start = x->compl_end = 0;
+	x->compl_alternatives = 0;
 	/* S6c step 2b: the bar is on by default and its colors are attributes (applied
 	 * later by attr_dictionary_process; these are the values a paint BEFORE that
 	 * would use). */
@@ -1169,6 +1183,10 @@ static void sc_code_free(t_sc_code *x) {
 	if (x->index) {
 		delete x->index;
 		x->index = NULL;
+	}
+	if (x->completer) {
+		delete x->completer;
+		x->completer = NULL;
 	}
 	jbox_free(&x->j_box);
 }
@@ -1410,6 +1428,133 @@ static void sc_code_paint_range(t_sc_code *x, t_jgraphics *g, const sc_code::Scr
 	}
 }
 
+/* --- S6c+: the completion session (⌃Space, SCODE.md §10.6) --------------- */
+
+/* Receiver the caret is typing after: `SinOsc.` -> `SinOsc`, anything else "". Same
+ * narrow rule as `sc_call`: only an identifier starting with an uppercase letter can be
+ * resolved, so `~x.` and `s.` get the generic list and nothing is guessed. */
+static std::string sc_code_compl_receiver(const std::string &text, int caret) {
+	int s = caret;
+	while (s > 0 && sc_code::Completer::is_word_byte((unsigned char)text[(size_t)s - 1]))
+		--s;
+	if (s == 0 || text[(size_t)s - 1] != '.')
+		return std::string();
+	const int e = s - 1;
+	int b = e;
+	while (b > 0 && sc_code::Completer::is_word_byte((unsigned char)text[(size_t)b - 1]))
+		--b;
+	if (b == e)
+		return std::string();
+	const char c0 = text[(size_t)b];
+	if (!(c0 >= 'A' && c0 <= 'Z'))
+		return std::string();
+	return text.substr((size_t)b, (size_t)(e - b));
+}
+
+static void sc_code_compl_close(t_sc_code *x) {
+	x->compl_open = 0;
+	x->compl_cycle = 0;
+	x->compl_word.clear();
+	x->compl_alternatives = 0;
+	x->compl_start = x->compl_end = x->buf->caret();
+}
+
+/* Asks the engine for the candidate at `cycle` and keeps the session in sync. Returns
+ * false when there is nothing to offer, and then the session CLOSES itself (§10.6: "si
+ * queda vacía se cierra sola"). The candidate source only changes with the receiver:
+ * `set_external` rebuilds the pool, so it is not done on every keystroke. */
+static bool sc_code_compl_refresh(t_sc_code *x, int cycle) {
+	if (!x->completer || !x->callaid)
+		return false;
+	sc_code_index_refresh(x);
+	const std::string text = x->buf->text();
+	const std::string receiver = sc_code_compl_receiver(text, x->buf->caret());
+	if (receiver != x->compl_receiver) {
+		x->compl_receiver = receiver;
+		const bool have_index = x->index && x->index->entries() > 0;
+		if (!receiver.empty() && have_index) {
+			/* After a dot: ONLY the methods of the receiver (exclusive), and if the class
+			 * is unknown the generic list instead of nothing. */
+			std::vector<std::string> methods = x->index->method_names_of(receiver);
+			if (!methods.empty())
+				x->completer->set_external(methods, true);
+			else
+				x->completer->set_external(x->index->class_names(), false);
+		} else if (have_index) {
+			/* Anywhere else: classes (+ the words of the document and the language
+			 * keywords, which the engine already has). */
+			x->completer->set_external(x->index->class_names(), false);
+		} else {
+			x->completer->clear_external();
+		}
+	}
+	x->completer->sync(text, x->buf->revision());
+
+	sc_code::Completion c;
+	/* min_prefix 0 = the user asked for it: an empty prefix (right after `SinOsc.`) is a
+	 * valid request and lists everything. */
+	if (!x->completer->suggest(text, x->buf->caret(), cycle, 0, c)) {
+		sc_code_compl_close(x);
+		return false;
+	}
+	x->compl_open = 1;
+	x->compl_cycle = c.index;
+	x->compl_start = c.start;
+	x->compl_end = c.end;
+	x->compl_word = c.word;
+	x->compl_alternatives = c.alternatives;
+	return true;
+}
+
+/* ⌃Space: open (or close) the session at the caret. */
+static void sc_code_compl_toggle(t_sc_code *x) {
+	if (x->compl_open) {
+		sc_code_compl_close(x);
+		return;
+	}
+	if (!x->callaid)
+		return; /* no bar, no session: there is nowhere to show it */
+	x->compl_cycle = 0;
+	x->compl_receiver.clear(); /* fresh candidate source for this caret */
+	sc_code_compl_refresh(x, 0);
+}
+
+static void sc_code_compl_cycle_by(t_sc_code *x, int delta) {
+	if (!x->compl_open)
+		return;
+	x->compl_cycle += delta;
+	sc_code_compl_refresh(x, x->compl_cycle);
+}
+
+/* ⏎: the candidate replaces the token it was suggesting for. One undo step, like the
+ * snippet expansion; readonly does not write. */
+static void sc_code_compl_accept(t_sc_code *x) {
+	if (!x->compl_open)
+		return;
+	if (x->readonly) {
+		sc_code_compl_close(x);
+		return;
+	}
+	const int line_before = x->buf->line_of_offset(x->buf->caret());
+	const int len = x->buf->length();
+	int a = x->compl_start, b = x->compl_end;
+	if (a < 0)
+		a = 0;
+	if (b > len)
+		b = len;
+	if (b < a)
+		b = a;
+	const std::string word = x->compl_word;
+	sc_code_compl_close(x); /* the request has no meaning once the text is replaced */
+	x->buf->set_selection(a, b);
+	if (!x->buf->insert_text(word))
+		return;
+	sc_code_after_key(x, line_before);
+	if (x->autowrite && x->buf->length() != len)
+		sc_code_autowrite_poke(x);
+	jbox_redraw(&x->j_box);
+}
+
 /* S6c: height of the RESERVED bar. 0 with `@callaid 0` (the text gets the whole box
  * back) or before the first paint measured the font. It comes from the font
  * (`bar_height` = rounded line height + 4), so it scales with `@fontsize`. */
@@ -1459,24 +1604,40 @@ static void sc_code_paint_bar(t_sc_code *x, t_jgraphics *g, const t_rect &rect) 
 	jgraphics_rectangle(g, 0., top, rect.width, 1.);
 	jgraphics_fill(g);
 
+	/* §10.6 — two modes, ONE bar. Precedence: an open session shows candidates; closing
+	 * it (Esc, ⏎, a click, or the filter running out) brings the signature back. */
+	const double bar_right = rect.width - (BAR_W + 2.);
+	const double text_x = sc_code_text_x(x);
+	int cells = 0;
+	if (x->char_w > 0. && bar_right > text_x)
+		cells = (int)std::floor((bar_right - text_x) / x->char_w);
+	/* Vertically centered in the strip (the strip is round(line_h) + 4). */
+	const double y = top + (x->bar_h - x->line_h) * 0.5 + x->ascent;
+
+	if (x->compl_open && !x->compl_word.empty()) {
+		const std::string counter =
+			std::to_string(x->compl_cycle + 1) + "/" + std::to_string(x->compl_alternatives);
+		const int ccells = sc_code::cells_in(counter);
+		jgraphics_set_source_rgba(g, x->barhighlight.red, x->barhighlight.green, x->barhighlight.blue,
+								  x->barhighlight.alpha);
+		jgraphics_move_to(g, text_x, y);
+		jgraphics_show_text(g, x->compl_word.c_str());
+		if (cells > ccells + 1) { /* too narrow: the candidate wins, the counter goes */
+			jgraphics_set_source_rgba(g, x->textcolor.red, x->textcolor.green, x->textcolor.blue, 0.70);
+			jgraphics_move_to(g, text_x + (double)(cells - ccells) * x->char_w, y);
+			jgraphics_show_text(g, counter.c_str());
+		}
+		return;
+	}
+
 	sc_code::BarModel model;
 	if (!sc_code_bar_model(x, &model))
 		return; /* context left / unknown method: the strip stays blank (§10.2) */
 
-	/* Cells available: from the text column (aligned with the code, gutter included) up
-	 * to the same right limit the text clip uses. The counter is right-aligned inside
-	 * them by `bar_layout`. */
-	const double text_x = sc_code_text_x(x);
-	const double right = rect.width - (BAR_W + 2.);
-	int cells = 0;
-	if (x->char_w > 0. && right > text_x)
-		cells = (int)std::floor((right - text_x) / x->char_w);
 	const sc_code::BarCells c = sc_code::bar_layout(model, cells);
 	if (c.text.empty())
 		return;
 
-	/* Vertically centered in the strip (the strip is round(line_h) + 4). */
-	const double y = top + (x->bar_h - x->line_h) * 0.5 + x->ascent;
 	const t_jrgba &tc = x->textcolor;
 	const t_jrgba &hc = x->barhighlight;
 	std::string pre, arg, post;
@@ -1780,6 +1941,7 @@ static void sc_code_getdrawparams(t_sc_code *x, t_object *patcherview, t_jboxdra
 
 #define K_RETURN (-4)
 #define K_TAB (-5)
+#define K_ESC (-3) /* JKEY_ESC: Max does not grab it (§3.9) */
 #define K_PERIOD 46 /* '.' (⇧. gives 62 ⇒ panic compares keycode, not textcharacter) */
 #define K_DELETE (-6)
 #define K_BACKSPACE (-7)
@@ -1874,6 +2036,24 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		return 1;
 	}
 
+	/* S6c+ — ⌃Space opens/closes the completion session (§10.6). macOS may own ⌃Space
+	 * ("Select next source in input menu") when there is more than one input layout, so
+	 * ⌥Space is accepted as the fallback decided in the plan. The space keycode is matched
+	 * on both sides (32 and 49) on purpose: it is the one measurement of the keymap that
+	 * was never taken on this keyboard. */
+	const bool space_key = (keycode == 32 || keycode == 49 || textcharacter == 32);
+	if (!cmd && (ctrl || alt) && space_key) {
+		sc_code_compl_toggle(x);
+		jbox_redraw(&x->j_box);
+		return 1;
+	}
+
+	/* Any OTHER key ends the session before doing its own thing: Tab, ⏎, Esc and
+	 * printable text belong to the session while it is open (handled in the switch). */
+	if (x->compl_open && keycode != K_TAB && keycode != K_RETURN && keycode != K_ESC &&
+		(cmd || ctrl || !sc_is_printable(textcharacter)))
+		sc_code_compl_close(x);
+
 	/* ⌃. = panic (`CmdPeriod.run`), through the outlet ⇒ there is no global Max
 	 * shortcut. `⌘.` is still accepted (verified 30-oct: `⌘.` does NOT reach the
 	 * object — Max stops it in two layers that cannot be reassigned: the Cocoa
@@ -1890,6 +2070,11 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 	switch (keycode) {
 	/* --- evaluation (SCODE.md §1/§3.2) ------------------------------------ */
 	case K_RETURN:
+		/* S6c+: inside the session ⏎ inserts the candidate, it does not evaluate. */
+		if (x->compl_open && !cmd && !ctrl && !alt) {
+			sc_code_compl_accept(x);
+			return 1;
+		}
 		if (cmd && shift) {
 			sc_code_eval_with_mode(x, sc_code::EvalModeDocument); /* agregado nuestro (§7.1) */
 			return 1;
@@ -2010,8 +2195,13 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		buf.move_line_end(shift);
 		break;
 
-	/* --- Tab = spaces (§7.1 decision) ------------------------------------- */
+	/* --- Tab = spaces (§7.1 decision), or cycling inside a session (S6c+) --- */
 	case K_TAB:
+		if (x->compl_open) {
+			sc_code_compl_cycle_by(x, shift ? -1 : 1);
+			jbox_redraw(&x->j_box);
+			return 1;
+		}
 		if (x->readonly)
 			return 1;
 		if (shift)
@@ -2019,6 +2209,15 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		else
 			buf.insert_tab((int)x->tabwidth);
 		break;
+
+	/* --- Esc: closes the session, otherwise it is Max's ---------------------- */
+	case K_ESC:
+		if (x->compl_open) {
+			sc_code_compl_close(x);
+			jbox_redraw(&x->j_box);
+			return 1;
+		}
+		return 0;
 
 	default:
 		/* Printable: only without ⌘/⌃ (those carry textcharacter 0 and are shortcuts,
@@ -2044,6 +2243,11 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		}
 		break;
 	}
+
+	/* S6c+: typing inside the session FILTERS it, and when nothing matches any more it
+	 * closes itself (§10.6). */
+	if (x->compl_open && !x->readonly && !cmd && !ctrl && sc_is_printable(textcharacter))
+		sc_code_compl_refresh(x, 0);
 
 	/* The caret ALWAYS ends up visible: it is the rule that makes the editor
 	 * usable with documents taller than the box (typing, arrows, ⌘↑/↓,
@@ -2292,6 +2496,11 @@ static void sc_code_mouseenter(t_sc_code *x, t_object *patcherview, t_pt pt, lon
 
 static long sc_code_mousedown(t_sc_code *x, t_object *patcherview, t_pt pt, long modifiers) {
 	sc_code::Buffer &buf = *x->buf;
+
+	/* S6c+: a click ends the completion session (§10.6: it is a mode the user opened
+	 * explicitly and it does not survive the caret moving). */
+	if (x->compl_open)
+		sc_code_compl_close(x);
 
 	/* Right click (or ⌃click, which Max delivers the same way): context menu. The
 	 * event is consumed so that Max does not show its own. */
