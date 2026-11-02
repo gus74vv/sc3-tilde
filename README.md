@@ -22,7 +22,10 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 * **macOS 11 or newer, Apple Silicon (arm64).** There is no official Intel build; see
   [Building from source](#building-from-source) if you need x86_64.
 * **Max 9** (tested with 9.2).
-* **SuperCollider 3.14.1 installed** at `/Applications/SuperCollider.app`.
+* **SuperCollider 3.14.1 installed** at `/Applications/SuperCollider.app` — from
+  [supercollider/supercollider](https://github.com/supercollider/supercollider)
+  ([Version-3.14.1](https://github.com/supercollider/supercollider/releases/tag/Version-3.14.1)
+  has the macOS `.dmg`).
 
 The SuperCollider class library and the stock `.scx` plugins are **not** bundled: the
 engine compiles the installed class library and loads the installed UGen plugins, exactly
