@@ -46,7 +46,8 @@ inline char match_of(char c) {
 struct Open {
 	char kind; /* '(' '[' '{' */
 	int offset;
-	int commas; /* level 0 commas seen (only used for '(') */
+	int commas;     /* level 0 commas seen (only used for '(') */
+	int arg_start;  /* first byte of the current argument (only used for '(') */
 };
 
 } // namespace
@@ -134,6 +135,7 @@ CallContext call_context_at(const std::string &text, int caret) {
 			o.kind = c;
 			o.offset = i;
 			o.commas = 0;
+			o.arg_start = i + 1;
 			stack.push_back(o);
 			continue;
 		}
@@ -148,8 +150,10 @@ CallContext call_context_at(const std::string &text, int caret) {
 			}
 			continue;
 		}
-		if (c == ',' && !stack.empty() && stack.back().kind == '(')
+		if (c == ',' && !stack.empty() && stack.back().kind == '(') {
 			stack.back().commas += 1;
+			stack.back().arg_start = i + 1;
+		}
 	}
 
 	/* The call's parenthesis: the INNERMOST open '('. */
@@ -158,6 +162,7 @@ CallContext call_context_at(const std::string &text, int caret) {
 		if (stack[(size_t)k].kind == '(') {
 			p = stack[(size_t)k].offset;
 			out.arg = stack[(size_t)k].commas;
+			out.arg_start = stack[(size_t)k].arg_start;
 			break;
 		}
 	}
@@ -265,6 +270,19 @@ CallContext call_context_at(const std::string &text, int caret) {
 	out.method = text.substr((size_t)mStart, (size_t)(mEnd - mStart));
 	out.open_paren = p;
 	return out;
+}
+
+bool call_arg_clean_start(const std::string &text, const CallContext &cc, int caret) {
+	if (caret < 0)
+		caret = 0;
+	if (caret > (int)text.size())
+		caret = (int)text.size();
+	if (cc.arg_start < 0 || cc.arg_start > caret)
+		return false;
+	for (int i = cc.arg_start; i < caret; ++i)
+		if (!is_blank(text[(size_t)i]))
+			return false;
+	return true;
 }
 
 } // namespace sc_code

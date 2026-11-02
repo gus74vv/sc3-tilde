@@ -30,6 +30,9 @@
  *   - If the call already closed (`)` before the caret) there is no context.
  *   - With no call open, the caret inside or at either edge of `Class.method` gives
  *     the context of that name, with `arg` = -1 (no current argument).
+ *   - `arg_start` is the beginning of the current argument (after the `(` or after the
+ *     last level-0 comma): that is what tells the argument template of §10.7 whether the
+ *     caret is at a CLEAN start or in the middle of a value.
  *
  *     This program is free software; you can redistribute it and/or modify
  *     it under the terms of the GNU General Public License as published by
@@ -50,11 +53,21 @@ struct CallContext {
 	int open_paren;     /* offset of the `(`; -1 = the caret is on the name, no call */
 	int arg;            /* current argument, 0-based (may run past the end if there are
 	                     * extra commas); -1 = unknown / no current argument */
+	int arg_start;      /* first byte of the current argument: right after the `(` or after
+	                     * the last level-0 comma (-1 = no call). The argument TEMPLATE
+	                     * (Tab inserts `name: `) only fires when what is between here and
+	                     * the caret is whitespace; */
 
-	CallContext() : valid(false), open_paren(-1), arg(0) {}
+	CallContext() : valid(false), open_paren(-1), arg(0), arg_start(-1) {}
 };
 
 /* Context of the call that contains `caret` (0 <= caret <= text.size()). */
 CallContext call_context_at(const std::string &text, int caret);
+
+/* True when the caret sits at a CLEAN start of the current argument: between
+ * `cc.arg_start` and the caret there are only blanks. That is the condition of the
+ * argument template (§10.7: Tab writes `name: `); in the middle of a value it is false
+ * and Tab indents. */
+bool call_arg_clean_start(const std::string &text, const CallContext &cc, int caret);
 
 } // namespace sc_code

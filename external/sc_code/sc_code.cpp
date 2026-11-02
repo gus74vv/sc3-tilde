@@ -1569,6 +1569,32 @@ static void sc_code_compl_accept(t_sc_code *x) {
 	jbox_redraw(&x->j_box);
 }
 
+/* S6c / §10.7 — the argument TEMPLATE of the IDE. Inside `SinOsc.ar(` Tab writes the name
+ * of the current argument (`freq: `) and leaves the caret ready for the value; after the
+ * comma, Tab writes the next one (`phase: `), and so on. It only fires at a CLEAN start
+ * (nothing but spaces between the `(` or the last comma and the caret) and when the index
+ * knows the signature, so Tab in the middle of a value still indents. */
+static bool sc_code_arg_label(t_sc_code *x) {
+	if (!x->index || x->buf->has_selection())
+		return false;
+	sc_code_index_refresh(x);
+	if (x->index->entries() <= 0)
+		return false;
+	const std::string text = x->buf->text();
+	const int caret = x->buf->caret();
+	const sc_code::CallContext cc = sc_code::call_context_at(text, caret);
+	if (!cc.valid || cc.open_paren < 0 || cc.arg < 0 || cc.arg_start < 0)
+		return false;
+	if (!sc_code::call_arg_clean_start(text, cc, caret))
+		return false; /* in the middle of a value: this Tab is an indentation */
+	const std::string method = cc.method.empty() ? std::string("new") : cc.method;
+	const sc_code::MethodSig *sig =
+		cc.method.empty() ? x->index->find_direct(cc.owner, method) : x->index->find(cc.owner, method);
+	if (!sig || cc.arg >= (int)sig->args.size())
+		return false;
+	return x->buf->insert_text(sig->args[(size_t)cc.arg] + ": ");
+}
+
 /* S6c: height of the RESERVED bar. 0 with `@callaid 0` (the text gets the whole box
  * back) or before the first paint measured the font. It comes from the font
  * (`bar_height` = rounded line height + 4), so it scales with `@fontsize`. */
@@ -2220,10 +2246,16 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		}
 		if (x->readonly)
 			return 1;
-		if (shift)
+		if (shift) {
 			buf.outdent((int)x->tabwidth);
-		else
-			buf.insert_tab((int)x->tabwidth);
+			break;
+		}
+		/* §10.7: at a clean start of an argument of a known call, Tab writes `name: `
+		 * (IDE behavior) instead of a hard tab. `break`, so the tail updates the highlight
+		 * and the autowrite exactly like any other edit. */
+		if (sc_code_arg_label(x))
+			break;
+		buf.insert_tab((int)x->tabwidth);
 		break;
 
 	/* --- Esc: closes the session, otherwise it is Max's ---------------------- */
