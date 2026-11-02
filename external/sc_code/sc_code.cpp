@@ -45,8 +45,10 @@
 #include <string>
 #include <sys/stat.h>
 
-#include "sc_bracket.h"
+#include "sc_bar.h"
 #include "sc_blink.h"
+#include "sc_bracket.h"
+#include "sc_call.h"
 #include "sc_buffer.h"
 #include "sc_clipboard.h"
 #include "sc_filedialog.h"
@@ -59,7 +61,15 @@
 #include "sc_snip.h"
 #include "sc_wrap.h"
 
-/* 0.9.4: the context menu pops AT the click point (it appeared far outside the box
+/* 0.9.6 (S6c step 2b): the BOTTOM BAR is wired. With `@callaid 1` (default) a line is
+ * RESERVED at the bottom of the box (`h - bar_height`, so the caret can never hide
+ * behind it) and it shows the signature of the call that contains the caret
+ * (`SinOsc.ar(` ⇒ `SinOsc.ar(freq, phase, mul, add)`, current argument highlighted,
+ * `2/4` on the right). The data comes from the class library index (§10.1) read by
+ * `mtime`: `stat` on every paint, the 1,16 MB dump re-read only when it changed.
+ * `@barcolor`/`@barhighlight` are the colors; with `@callaid 0` nothing changes for the
+ * text. It is display-only: no key is intercepted and the buffer is never touched.
+ * 0.9.4: the context menu pops AT the click point (it appeared far outside the box
  * when the box was not near the canvas origin: the box-local mouse point was passed
  * as canvas coordinates) and two defaults changed by user request: `@blinkduration`
  * 500 ms (was 400) and `@scrollspeed` 3. (was 1.).
@@ -86,7 +96,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.5"
+#define SC_CODE_VERSION "0.9.6"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -170,6 +180,18 @@ typedef struct _sc_code {
 
 	/* --- S6c: index of the class library ('index', SCODE.md §10.1) -------- */
 	t_symbol *indexfile;        /* @indexfile: the file sclang writes the dump to */
+	sc_code::ClassIndex *index; /* the parsed dump (heap: std::map members) */
+	std::string index_loaded;   /* path the current dict came from ("" = none) */
+	long index_mtime;           /* stamp of the dump as last read */
+	long long index_size;
+	long index_warned;          /* the "never generated" notice goes once per object */
+
+	/* --- S6c step 2b: the bottom bar (§10.2) ------------------------------ */
+	long callaid;               /* 1 = reserved bar with the signature (default 1) */
+	double bar_h;               /* bar height in px (0 = no bar, from sc_code_bar_height) */
+	long bar_grab;              /* 1 = the mousedown was on the bar: ignore the drag */
+	t_jrgba barcolor;           /* bar background */
+	t_jrgba barhighlight;       /* color of the current argument */
 
 	/* --- 0.9.1: wheel / trackpad speed ------------------------------------ */
 	double scrollspeed;         /* @scrollspeed: px per delta unit (default 3.) */
@@ -580,6 +602,59 @@ static void sc_code_index_msg(t_sc_code *x, t_symbol *s, long argc, t_atom *argv
 	outlet_anything(x->out_eval, gensym("eval"), 1, &a);
 }
 
+/* S6c step 2b: the dump is read HERE, not by the message above (sclang writes it
+ * asynchronously and nothing in `sc_code` waits for it). The stamp is `stat`ed on every
+ * paint — two syscalls, cheaper than a timer and it can never leave the bar stale —
+ * and the 1,16 MB file is parsed ONLY when mtime/size changed (once per regeneration,
+ * §10.1). `@callaid 0` costs nothing: no stat, no bar. */
+static void sc_code_index_refresh(t_sc_code *x) {
+	if (!x->callaid || !x->index)
+		return;
+	const std::string path = sc_code_index_path(x);
+	if (path.empty())
+		return;
+	long mtime = 0;
+	long long size = 0;
+	if (!sc_code_file_stamp(path, &mtime, &size)) {
+		/* Never generated: ONE notice per object (the index is shared by the whole
+		 * installation, so generating it from any `sc_code` fixes this one too). */
+		if (!x->index_warned) {
+			x->index_warned = 1;
+			object_post((t_object *)x, "call aid: no index yet — send `index` to write %s",
+						path.c_str());
+		}
+		return;
+	}
+	if (path == x->index_loaded && mtime == x->index_mtime && size == x->index_size)
+		return;
+	FILE *f = fopen(path.c_str(), "rb");
+	if (!f)
+		return;
+	std::string text;
+	char chunk[4096];
+	size_t n;
+	while ((n = fread(chunk, 1, sizeof(chunk), f)) > 0)
+		text.append(chunk, n);
+	fclose(f);
+	if (!x->index->load(text)) {
+		/* Half written (no `#end`): the all-or-nothing rule of sc_index keeps the
+		 * previous answer and the next paint retries by itself. */
+		object_error((t_object *)x, "call aid: %s has no `#end` (half written?) — ignored",
+					 path.c_str());
+		x->index_loaded.clear();
+		return;
+	}
+	x->index_loaded = path;
+	x->index_mtime = mtime;
+	x->index_size = size;
+	const std::string ver = x->index->version();
+	if (ver.empty())
+		object_post((t_object *)x, "call aid: %d entries from %s", x->index->entries(), path.c_str());
+	else
+		object_post((t_object *)x, "call aid: %d entries (sclang %s) from %s", x->index->entries(),
+					ver.c_str(), path.c_str());
+}
+
 /* `jsave`: the TEXT is not an attribute (it is the document state) ⇒ it goes into
  * the patch dictionary. The caret and the scroll are saved with it so that
  * reopening the patch leaves the editor where it was.
@@ -778,6 +853,8 @@ static t_max_err sc_code_set_file(t_sc_code *x, t_object *attr, long argc, t_ato
 /**********************************************************************/
 /* life cycle                                                          */
 
+static double sc_code_bar_height(t_sc_code *x);
+
 static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv);
 static void sc_code_free(t_sc_code *x);
 static void sc_code_paint(t_sc_code *x, t_object *view);
@@ -868,6 +945,19 @@ C74_EXPORT void ext_main(void *r) {
 	CLASS_ATTR_SAVE(c, "indexfile", 0);
 	/* 'index' / 'index <path>': emits the generator through the eval outlet. */
 	class_addmethod(c, (method)sc_code_index_msg, "index", A_GIMME, 0);
+
+	/* S6c step 2b: the bottom bar with the signature of the call under the caret
+	 * (§10.2). `@callaid 1` (default) RESERVES one line at the bottom, so the caret can
+	 * never end up behind it; `0` gives the whole box back to the text. Display only:
+	 * no key is intercepted and the buffer is never written. */
+	CLASS_ATTR_LONG(c, "callaid", 0, t_sc_code, callaid);
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "callaid", 0, "1");
+
+	CLASS_ATTR_RGBA(c, "barcolor", 0, t_sc_code, barcolor);
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "barcolor", 0, "0.125 0.135 0.160 1.");
+
+	CLASS_ATTR_RGBA(c, "barhighlight", 0, t_sc_code, barhighlight);
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "barhighlight", 0, "1.0 0.55 0.15 1.");
 
 	/* --- S5b: colors (RGBA, saved with the patch) --------------------------- */
 	CLASS_ATTR_RGBA(c, "bgcolor", 0, t_sc_code, bgcolor);
@@ -997,6 +1087,16 @@ static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv) {
 	x->snipfile = NULL;
 	x->snips = new ScSnipState(); /* S6: empty dict until `@snippets` */
 	x->indexfile = NULL;          /* S6c: no index until `@indexfile` */
+	x->index = new sc_code::ClassIndex(); /* empty until the dump is read */
+	x->index_mtime = 0;
+	x->index_size = -1;
+	x->index_warned = 0;
+	/* S6c step 2b: the bar is on by default and its colors are attributes (applied
+	 * later by attr_dictionary_process; these are the values a paint BEFORE that
+	 * would use). */
+	x->callaid = 1;
+	x->bar_h = 0.;
+	x->bar_grab = 0;
 	x->gutter_w = 0.;
 	x->autowrite_clock = clock_new(x, (method)sc_code_autowrite_tick);
 	x->titlebar = 1;
@@ -1066,6 +1166,10 @@ static void sc_code_free(t_sc_code *x) {
 		delete x->snips;
 		x->snips = NULL;
 	}
+	if (x->index) {
+		delete x->index;
+		x->index = NULL;
+	}
 	jbox_free(&x->j_box);
 }
 
@@ -1122,8 +1226,10 @@ static sc_code::ScrollMetrics sc_code_metrics(t_sc_code *x) {
 	m.line_count = x->wraps.row_count();
 	m.line_h = x->line_h > 0. ? x->line_h : 16.;
 	/* The title bar is NOT a text area: the content and the scroll live below it.
-	 * Everything vertical from here down is measured INSIDE that area. */
-	m.view_h = x->view_h - x->title_h;
+	 * Everything vertical from here down is measured INSIDE that area. S6c: the same goes
+	 * for the reserved bottom bar, so `ensure_line`/`clamp`/page up/down already keep the
+	 * caret ABOVE it (there is no extra clamp to forget). */
+	m.view_h = x->view_h - x->title_h - x->bar_h;
 	if (m.view_h < 0.)
 		m.view_h = 0.;
 	m.pad_y = PAD_Y;
@@ -1304,6 +1410,102 @@ static void sc_code_paint_range(t_sc_code *x, t_jgraphics *g, const sc_code::Scr
 	}
 }
 
+/* S6c: height of the RESERVED bar. 0 with `@callaid 0` (the text gets the whole box
+ * back) or before the first paint measured the font. It comes from the font
+ * (`bar_height` = rounded line height + 4), so it scales with `@fontsize`. */
+static double sc_code_bar_height(t_sc_code *x) {
+	if (!x->callaid || x->line_h <= 0.)
+		return 0.;
+	return (double)sc_code::bar_height(x->line_h);
+}
+
+/* What the bar shows: the signature of the call that contains the caret. "No bar"
+ * (blank, it is never hidden) when there is no call context, when the method is not in
+ * the index, or when `@callaid 0`. The receiver shown is the one the user TYPED and not
+ * the class that defines the method: `SinOsc.play` has to read `SinOsc.play(…)` even
+ * though the index found it two levels up in `Object` (sc_index walks the chain). */
+static bool sc_code_bar_model(t_sc_code *x, sc_code::BarModel *out) {
+	*out = sc_code::BarModel();
+	if (!x->index || x->index->entries() <= 0)
+		return false;
+	const sc_code::CallContext cc = sc_code::call_context_at(x->buf->text(), x->buf->caret());
+	if (!cc.valid)
+		return false;
+	const sc_code::MethodSig *sig = x->index->find(cc.owner, cc.method);
+	if (!sig)
+		return false;
+	*out = sc_code::bar_model(cc.owner, cc.method, sig->args, cc.arg);
+	return true;
+}
+
+/* The bar itself: one reserved line at the bottom of the box, painted OVER everything
+ * (`text` is already clipped above it). Layout, truncation and the priority of the
+ * current argument over the head of the signature live in `sc_bar` (headless,
+ * tests/bar_test.cpp); here it is only measured and drawn. */
+static void sc_code_paint_bar(t_sc_code *x, t_jgraphics *g, const t_rect &rect) {
+	if (x->bar_h <= 0.)
+		return;
+	const double top = rect.height - x->bar_h;
+	jgraphics_rectangle(g, 0., top, rect.width, x->bar_h);
+	jgraphics_set_source_rgba(g, x->barcolor.red, x->barcolor.green, x->barcolor.blue, x->barcolor.alpha);
+	jgraphics_fill(g);
+	jgraphics_set_source_rgba(g, x->textcolor.red, x->textcolor.green, x->textcolor.blue, 0.12);
+	jgraphics_rectangle(g, 0., top, rect.width, 1.);
+	jgraphics_fill(g);
+
+	sc_code::BarModel model;
+	if (!sc_code_bar_model(x, &model))
+		return; /* context left / unknown method: the strip stays blank (§10.2) */
+
+	/* Cells available: from the text column (aligned with the code, gutter included) up
+	 * to the same right limit the text clip uses. The counter is right-aligned inside
+	 * them by `bar_layout`. */
+	const double text_x = sc_code_text_x(x);
+	const double right = rect.width - (BAR_W + 2.);
+	int cells = 0;
+	if (x->char_w > 0. && right > text_x)
+		cells = (int)std::floor((right - text_x) / x->char_w);
+	const sc_code::BarCells c = sc_code::bar_layout(model, cells);
+	if (c.text.empty())
+		return;
+
+	/* Vertically centered in the strip (the strip is round(line_h) + 4). */
+	const double y = top + (x->bar_h - x->line_h) * 0.5 + x->ascent;
+	const t_jrgba &tc = x->textcolor;
+	const t_jrgba &hc = x->barhighlight;
+	std::string pre, arg, post;
+	if (c.hl_start >= 0 && c.hl_end > c.hl_start) {
+		pre = c.text.substr(0, (size_t)c.hl_start);
+		arg = c.text.substr((size_t)c.hl_start, (size_t)(c.hl_end - c.hl_start));
+		post = c.text.substr((size_t)c.hl_end);
+	} else {
+		pre = c.text;
+	}
+	/* Three runs, each one placed by CELLS (`…` is 3 bytes and 1 cell, so the byte count
+	 * would drift). */
+	double pen = text_x;
+	jgraphics_set_source_rgba(g, tc.red, tc.green, tc.blue, 0.55);
+	jgraphics_move_to(g, pen, y);
+	jgraphics_show_text(g, pre.c_str());
+	pen += (double)sc_code::cells_in(pre) * x->char_w;
+	if (!arg.empty()) {
+		jgraphics_set_source_rgba(g, hc.red, hc.green, hc.blue, hc.alpha);
+		jgraphics_move_to(g, pen, y);
+		jgraphics_show_text(g, arg.c_str());
+		pen += (double)sc_code::cells_in(arg) * x->char_w;
+	}
+	if (!post.empty()) {
+		jgraphics_set_source_rgba(g, tc.red, tc.green, tc.blue, 0.55);
+		jgraphics_move_to(g, pen, y);
+		jgraphics_show_text(g, post.c_str());
+	}
+	if (!c.counter.empty() && c.counter_col >= 0) {
+		jgraphics_set_source_rgba(g, tc.red, tc.green, tc.blue, c.arg_visible ? 0.70 : 0.40);
+		jgraphics_move_to(g, text_x + (double)c.counter_col * x->char_w, y);
+		jgraphics_show_text(g, c.counter.c_str());
+	}
+}
+
 static void sc_code_paint(t_sc_code *x, t_object *view) {
 	t_jgraphics *g = (t_jgraphics *)patcherview_get_jgraphics(view);
 	t_rect rect;
@@ -1333,6 +1535,10 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	/* title bar (S5c): fixed strip on top, one line high. It does NOT scroll and is
 	 * NOT a text area: `sc_code_metrics` subtracts its height from the window. */
 	x->title_h = (x->titlebar && x->line_h > 0.) ? x->line_h : 0.;
+	/* S6c: the bottom bar is RESERVED, never intermittent (showing and hiding it would
+	 * reflow the wrap and make the caret jump). `sc_code_metrics` subtracts it. */
+	sc_code_index_refresh(x);
+	x->bar_h = sc_code_bar_height(x);
 	if (x->title_h > 0.) {
 		double r = x->bgcolor.red + 0.07, gg = x->bgcolor.green + 0.07, b = x->bgcolor.blue + 0.07;
 		if (r > 1.)
@@ -1383,7 +1589,7 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	double clip_w = rect.width - text_x - (BAR_W + 2.);
 	if (clip_w < 1.)
 		clip_w = 1.;
-	double clip_h = rect.height - x->title_h;
+	double clip_h = rect.height - x->title_h - x->bar_h;
 	if (clip_h < 1.)
 		clip_h = 1.;
 	jgraphics_save(g);
@@ -1513,7 +1719,7 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	 * while scrolling). */
 	if (x->gutter_w > 0.) {
 		jgraphics_set_source_rgba(g, x->textcolor.red, x->textcolor.green, x->textcolor.blue, 0.10);
-		jgraphics_rectangle(g, x->gutter_w - 1., x->title_h, 1., rect.height - x->title_h);
+		jgraphics_rectangle(g, x->gutter_w - 1., x->title_h, 1., rect.height - x->title_h - x->bar_h);
 		jgraphics_fill(g);
 
 		char num[16];
@@ -1542,6 +1748,9 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 		jgraphics_rectangle(g, thumb.x, thumb.y, thumb.width, thumb.height);
 		jgraphics_fill(g);
 	}
+
+	/* S6c: the reserved bar goes LAST, over the (already clipped) text. */
+	sc_code_paint_bar(x, g, rect);
 }
 
 static void sc_code_getdrawparams(t_sc_code *x, t_object *patcherview, t_jboxdrawparams *params) {
@@ -1896,7 +2105,7 @@ static void sc_code_autoscroll_drag(t_sc_code *x, t_pt *pt) {
 	if (x->line_h <= 0. || x->view_h <= 0.)
 		return;
 	const double top = x->title_h + PAD_Y;
-	const double bottom = x->view_h - PAD_Y;
+	const double bottom = x->view_h - x->bar_h - PAD_Y;
 	if (pt->y >= top && pt->y <= bottom)
 		return;
 	const sc_code::ScrollMetrics m = sc_code_metrics(x);
@@ -2085,6 +2294,14 @@ static long sc_code_mousedown(t_sc_code *x, t_object *patcherview, t_pt pt, long
 		return 1;
 	}
 
+	/* S6c: the bottom bar is not text. A click there moves NOTHING (the caret stays where
+	 * it is, which is the point of reserving it) and the drag that may follow is ignored
+	 * with the same flag. */
+	if (x->bar_h > 0. && pt.y >= x->view_h - x->bar_h) {
+		x->bar_grab = 1;
+		return 0;
+	}
+
 	/* Click on the title bar: it does not move the caret (it is a strip, not
 	 * text). */
 	if (pt.y < x->title_h)
@@ -2145,6 +2362,8 @@ static long sc_code_mousedown(t_sc_code *x, t_object *patcherview, t_pt pt, long
 }
 
 static void sc_code_mousedrag(t_sc_code *x, t_object *patcherview, t_pt pt, long modifiers) {
+	if (x->bar_grab)
+		return; /* the drag was born on the bar (S6c): it does not select */
 	if (x->sb_drag) {
 		const sc_code::ScrollMetrics m = sc_code_metrics(x);
 		x->scroll.drag_thumb_to(pt.y - x->title_h - PAD_Y - x->sb_grab, m);
@@ -2160,6 +2379,7 @@ static void sc_code_mousedrag(t_sc_code *x, t_object *patcherview, t_pt pt, long
 static void sc_code_mouseup(t_sc_code *x, t_object *patcherview, t_pt pt, long modifiers) {
 	x->dragging = 0;
 	x->sb_drag = 0;
+	x->bar_grab = 0;
 	jbox_redraw(&x->j_box); /* clears the thumb highlight */
 }
 

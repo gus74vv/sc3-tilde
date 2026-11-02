@@ -30,7 +30,7 @@
 				"box": {
 					"id": "obj-1",
 					"maxclass": "comment",
-					"text": "sc_code — in-patch sclang code editor for sc3~  (0.9.5)",
+					"text": "sc_code — in-patch sclang code editor for sc3~  (0.9.6)",
 					"numinlets": 1,
 					"numoutlets": 0,
 					"patching_rect": [
@@ -265,6 +265,23 @@
 						470,
 						260,
 						55
+					],
+					"fontsize": 11.0,
+					"fontname": "Menlo"
+				}
+			},
+			{
+				"box": {
+					"id": "obj-16",
+					"maxclass": "comment",
+					"text": "CALL AID: @callaid 1 (default) reserves the bottom line for the signature of the call under the caret (current argument in @barhighlight, n/N on the right, @barcolor). Send `index` once: sclang writes the class library index (~/Documents/Max 9/Library/sc_code-index.txt) and every sc_code reads it; @indexfile overrides the path.",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						740,
+						530,
+						260,
+						70
 					],
 					"fontsize": 11.0,
 					"fontname": "Menlo"
