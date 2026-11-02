@@ -23,9 +23,10 @@ ARCHFLAGS := -arch $(SC_CODE_ARCH) -mmacosx-version-min=$(SC_CODE_MINOS)
 B := build
 
 CORE_SRC := sc_lexer.cpp sc_region.cpp sc_buffer.cpp sc_indent.cpp sc_scroll.cpp sc_highlight.cpp \
-            sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp sc_index.cpp
+            sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp sc_index.cpp \
+            sc_call.cpp sc_bar.cpp
 CORE_HDR := sc_lexer.h sc_region.h sc_buffer.h sc_indent.h sc_scroll.h sc_highlight.h sc_bracket.h \
-            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h
+            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h sc_call.h sc_bar.h
 # Pure C++ for the tests; the clipboard (ObjC++) only goes into the bundle.
 UI_SRC := sc_code.cpp sc_clipboard.mm sc_filedialog.mm
 UI_HDR := sc_code.cpp sc_clipboard.h sc_filedialog.h
@@ -46,7 +47,7 @@ $(B)/region_test: tests/region_test.cpp $(CORE_SRC) $(CORE_HDR)
 
 test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/scroll_test \
       $(B)/highlight_test $(B)/bracket_test $(B)/wrap_test $(B)/blink_test $(B)/snip_test \
-      $(B)/path_test $(B)/index_test
+      $(B)/path_test $(B)/index_test $(B)/call_test $(B)/bar_test
 	./$(B)/lexer_test
 	./$(B)/region_test
 	./$(B)/buffer_test
@@ -59,6 +60,18 @@ test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/sc
 	./$(B)/snip_test
 	./$(B)/path_test
 	./$(B)/index_test
+	./$(B)/call_test
+	./$(B)/bar_test
+
+# S6c: bottom bar — geometry and text layout in monospace cells — pure C++.
+$(B)/bar_test: tests/bar_test.cpp sc_bar.cpp sc_bar.h
+	@mkdir -p $(B)
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/bar_test.cpp sc_bar.cpp -o $@
+
+# S6c: method call context (which `Class.method(` contains the caret) — pure C++.
+$(B)/call_test: tests/call_test.cpp sc_call.cpp sc_call.h
+	@mkdir -p $(B)
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/call_test.cpp sc_call.cpp -o $@
 
 # S6c: class library index (parse + query + sclang generator) — pure C++, no Max.
 $(B)/index_test: tests/index_test.cpp sc_index.cpp sc_index.h
