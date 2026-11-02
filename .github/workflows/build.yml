@@ -31,10 +31,18 @@ jobs:
       # The 3.14.1 release publishes a universal .dmg for macOS (no .zip), so the
       # app is mounted and copied out of it.
       - name: Install SuperCollider 3.14.1 (runtime dependency)
+        # The release lookup is AUTHENTICATED: unauthenticated API calls share 60/hour
+        # per runner IP, and when that limit is hit the answer is a JSON *message*
+        # instead of the release, so the lookup used to die with an unreadable
+        # KeyError: 'assets' (rerun of 02-nov failed twice on exactly that).
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          url=$(curl -sSL "https://api.github.com/repos/supercollider/supercollider/releases/tags/$SC_TAG" |
-            python3 -c 'import json,sys; r=json.load(sys.stdin); print(next(a["browser_download_url"] for a in r["assets"] if a["name"].endswith(".dmg") and "macOS-universal" in a["name"]))')
+          json=$(curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/supercollider/supercollider/releases/tags/$SC_TAG")
+          url=$(printf '%s' "$json" |
+            python3 -c 'import json,sys; r=json.load(sys.stdin); a=r.get("assets"); sys.exit("release lookup failed: " + str(r.get("message", r))) if a is None else print(next(x["browser_download_url"] for x in a if x["name"].endswith(".dmg") and "macOS-universal" in x["name"]))')
           echo "asset: $url"
           curl -sSL "$url" -o "$RUNNER_TEMP/sc.dmg"
           mkdir -p "$RUNNER_TEMP/sc"
