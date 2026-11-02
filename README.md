@@ -7,7 +7,7 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 | object | version | what it is |
 |---|---|---|
 | `sc3~` | 0.15.1 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
-| `sc_code` | 0.9.3 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. Its outlet sends the evaluated block to `sc3~`. |
+| `sc_code` | 0.9.7 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
  ┌─────────┐  eval <code>       ┌────────┐
@@ -55,6 +55,11 @@ Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
   `[print]` needed.
 * `panic` runs `CmdPeriod.run` (nodes + clocks + hooks), `freeall` only frees the nodes;
   `close` shuts the engine down.
+
+The release also ships **`examples/example.maxpat`**, a self-contained patch: it boots the
+engine, plays a demo from the `sc_code` buffer, shows the `set` path for Synth arguments
+from Max's UI and has a `panic` button (the way that is *not* `⌘.`). Its comments explain
+what to look at, including the one-time `index` message.
 
 > **Warning for SuperCollider users:** do **not** press `⌘.` in Max to kill the sound.
 > In Max that is *stop scheduler*, which halts Max's own scheduler and the whole patch
@@ -149,6 +154,9 @@ writes a file.
 | `⌘Z` / `⇧⌘Z` | undo / redo |
 | `⌘X` `⌘C` `⌘V` | cut / copy / paste |
 | `⌘S` / `⌘O` | save / open `.scd` |
+| `Tab` | insert the suggestion shown in the bar; at a clean start of an argument it writes the IDE template (`freq: `); with no suggestion it indents |
+| `⇧Tab` | cycle to the next suggestion, or outdent |
+| `Esc` | close the suggestions |
 
 Right-click opens the context menu (undo, clipboard, select all, save/load, panic).
 Like the SC IDE, only `( … )` counts as an evaluation region: `{ … }` and `[ … ]` spanning
@@ -156,9 +164,48 @@ several lines are not, so select them or use `⌘⇧Return`.
 
 Attributes: `@fontsize`, `@tabwidth`, `@linenumbers`, `@readonly`, `@autoclose`,
 `@autowrite`, `@autoload`, `@file`, `@snippets` (a `### key` + verbatim body file),
-`@wrap`, `@matchbrackets`, `@titlebar`, the per-token colours (`@keywordcolor`,
-`@stringcolor`, `@commentcolor`, …), `@bgcolor`, `@textcolor`, `@selcolor`,
-`@caretcolor`, `@blink`, `@blinkcolor`, `@blinkduration`, `@scrollspeed`.
+`@wrap`, `@matchbrackets`, `@titlebar`, `@callaid` (the bottom bar, `1` by default),
+`@barcolor`, `@barhighlight` (the current argument), `@indexfile` (the class library
+dump), the per-token colours (`@keywordcolor`, `@stringcolor`, `@commentcolor`, …),
+`@bgcolor`, `@textcolor`, `@selcolor`, `@caretcolor`, `@blink`, `@blinkcolor`,
+`@blinkduration`, `@scrollspeed`.
+
+### Call aid and the class library index
+
+`@callaid 1` (default) **reserves** one line at the bottom of the box. With the caret
+inside a call it shows that call's signature, the current argument highlighted and its
+position (`SinOsc.ar(freq, phase, mul, add)` with `2/4` on the right); with the caret on a
+written name (`Duty.kr`) it shows the same signature without the counter, and `Ndef(`
+resolves the constructor (`Ndef.new(key, object)`). The line is reserved instead of popped
+up, so the caret can never end up hidden behind it. `@callaid 0` gives the line back to
+the text.
+
+The signatures come from the **class library index**, a text file that `sclang` writes
+once:
+
+* wire the editor's outlet into `sc3~` and send `index` to `sc_code`: sclang dumps every
+  class, method and argument name (`index <path>` writes elsewhere, one shot).
+* one file per installation (`~/Documents/Max 9/Library/sc_code-index.txt`) shared by every
+  `sc_code`; `@indexfile <path>` points at a dump kept somewhere else.
+* regenerate it after installing Quarks, editing Extensions or updating SuperCollider:
+  methods added at runtime are not in the dump.
+* the editor only **reads** the file (`fopen`, re-parsed when `mtime`/`size` change), so the
+  bar works with no engine, no boot and no DSP. Without the file the bar stays empty and
+  the console says it once.
+
+### Completion
+
+Completion is **display-only**: typing never rewrites the buffer. From three letters on,
+the bar shows the best candidate for the token under the caret — after `Class.` only the
+methods of that class and its superclasses; anywhere else classes, the words of the
+document and the language keywords. `Tab` inserts it (one undo step), `⇧Tab` cycles,
+`Esc` closes, and typing filters (the bar closes itself when nothing is left). `Return` is
+never taken: it still evaluates or breaks the line. `⌃Space` opens the full list with no
+minimum prefix, on machines where macOS delivers that key to Max.
+
+`Tab` at a clean start of an argument writes the IDE's template instead: inside
+`SinOsc.ar(` it writes `freq: `, and after the comma the next one (`phase: `). Values are
+left to you: the default arguments are not in the index.
 
 ### Snippets file
 
@@ -270,7 +317,7 @@ Expect differences: this slice is not tested by the project's CI, so treat it as
 ## Tests
 
 The engine and the editor are tested headless (no Max needed): 156 engine checks +
-890 editor checks + a 9-case failure matrix (broken Quark, throwing `startup.scd`,
+1157 editor checks + a 9-case failure matrix (broken Quark, throwing `startup.scd`,
 corrupt `.scx`, port mismatch, impossible boot, eval that throws). The suite is **not**
 part of this tree, so there is no `make test` here — it lives with the development
 repository, next to the design notes.
@@ -280,3 +327,7 @@ repository, next to the design notes.
 GPL-3.0-only — see [LICENSE](LICENSE). The engine links SuperCollider's statics
 (`libsclang`, `libscsynth`), which are GPLv3, so this bundle is a derived work. Sources are
 published with every release.
+
+## Support
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T0W629WR81)
