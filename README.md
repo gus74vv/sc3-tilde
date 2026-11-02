@@ -39,7 +39,9 @@ at boot with a real error instead of leaving a silent engine.
 
 1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the
    **User Library** (`~/Documents/Max 9/Library`) is always in the path.
-2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Help`.
+2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Help`. Or don't copy
+   them at all. They are low-quality slop created with a Python script. Refer to
+   example.maxpat for a shorter and more practical explanation.
 3. **Restart Max** (`.mxo` files are loaded when the app starts).
 
 Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
