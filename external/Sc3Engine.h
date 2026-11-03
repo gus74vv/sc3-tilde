@@ -117,6 +117,12 @@ struct Sc3EngineStatus {
 	std::string classLibraryDir; // effective Resource dir
 	std::string ugensPath;       // effective mUGensPluginPath
 
+	// Bug #29: the eval in flight (see Sc3Engine::evalBusyMs). `busyMs` = 0 when
+	// sclang is idle; `stuck` = it already passed kEvalStuckMs (sclang cannot be
+	// interrupted: the code is looping).
+	long busyMs = 0;
+	bool stuck = false;
+
 	std::string degradeReport;   // set if there was a fallback to stock
 	std::string error;           // last boot error (empty if ok)
 };
@@ -169,6 +175,15 @@ public:
 	// used to look like "the object stopped answering".
 	const char *stateName() const;
 	long queuedJobs() const;
+	// Bug #29: an eval IN FLIGHT is not in `queue` (the worker pops it before
+	// running), so `queuedJobs() == 0` does not mean "sclang is idle". This is how
+	// long the current eval has been running (0 = nothing running right now) and
+	// whether it already passed kEvalStuckMs. The interpreter has NO preemption:
+	// an eval that loops (e.g. `t` = Array reaching `nextTimeOnGrid`) never returns,
+	// so the only possible answer is to say so instead of looking dead.
+	static constexpr long kEvalStuckMs = 10000;
+	long evalBusyMs() const; // ms the running eval has been going (0 = idle)
+	bool evalStuck() const;  // evalBusyMs() > kEvalStuckMs
 
 	// --- sclang: enqueue only (the worker runs it) ---------------------------
 	// eval() prints the result like the IDE post window (`-> value`);

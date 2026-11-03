@@ -55,6 +55,17 @@ namespace {
 
 constexpr size_t kMaxTextBuffer = 256 * 1024;
 
+// Bug #29: ms since the first call (monotonic). Only deltas are used: it times the
+// eval in flight so `info`/the watchdog can tell "sclang is busy" from "idle"
+// (the job leaves the queue BEFORE it runs, so `queuedJobs()` alone lies).
+long long nowMs()
+{
+	static const auto t0 = std::chrono::steady_clock::now();
+	return (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+	           std::chrono::steady_clock::now() - t0)
+	    .count();
+}
+
 // 3.4: scsynth posts through `scprintf`, which writes to stdout by default —
 // inside Max that is invisible (there is no scsynth console). This hook sends
 // that text to the engine buffers, and from there to the outlets: it is the
@@ -328,6 +339,12 @@ struct Sc3Engine::Impl {
 	bool stop = false;
 	bool bootDone = false;
 	bool bootOk = false;
+	// Bug #29: start of the eval the worker is running. Written by the worker, read
+	// by main (`info`, the watchdog) ⇒ atomics. `evalRunning` is the flag (0 ms after
+	// the first call to nowMs() is a legitimate start value, so the timestamp alone
+	// cannot mean "idle").
+	std::atomic<bool> evalRunning {false};
+	std::atomic<long long> evalStartMs {0};
 	// bug #23: owners, not a counter. `open(x)` / `release(x)` are idempotent per
 	// owner, so the same `sc3~` cannot inflate the count (a plain ++/-- did: on the
 	// "failed boot → open again" path the count drifted, the last `close` did not
@@ -1189,9 +1206,12 @@ struct Sc3Engine::Impl {
 				}
 			}
 			if (has && client) {
+				evalStartMs.store(nowMs());
+				evalRunning.store(true);
 				if (!job.setup.empty())
 					client->evaluate(job.setup, false);
 				client->evaluate(job.code, job.print);
+				evalRunning.store(false); // only after it RETURNED (bug #29)
 			}
 			if (client)
 				client->tick();
@@ -1368,6 +1388,19 @@ long Sc3Engine::queuedJobs() const
 	return (long)s.queue.size();
 }
 
+long Sc3Engine::evalBusyMs() const
+{
+	if (!m->evalRunning.load())
+		return 0;
+	return (long)(nowMs() - m->evalStartMs.load());
+}
+
+bool Sc3Engine::evalStuck() const
+{
+	const long busy = evalBusyMs();
+	return busy > 0 && busy > kEvalStuckMs;
+}
+
 Sc3EngineStatus Sc3Engine::status() const
 {
 	Impl &s = *m;
@@ -1393,6 +1426,8 @@ Sc3EngineStatus Sc3Engine::status() const
 	st.bootMs = s.bootMs.load();
 	st.numUnits = s.units.load();
 	st.serverRunning = st.serverRunning && st.ready;
+	st.busyMs = evalBusyMs();
+	st.stuck = evalStuck();
 	return st;
 }
 

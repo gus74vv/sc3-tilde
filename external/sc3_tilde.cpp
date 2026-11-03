@@ -100,6 +100,9 @@ typedef struct _sc3 {
 	   is only touched by the audio thread. 5 ms linear ramp. */
 	std::atomic<float> gain_target;
 	float gain;
+	/* Bug #29: the "eval is not returning" error was already posted for the eval in
+	   flight (cleared when sclang goes back to idle). */
+	int stuck_warned;
 } t_sc3;
 
 static t_class *sc3_class = NULL;
@@ -411,11 +414,18 @@ static void sc3_report_status(t_sc3 *x)
 	         SC3_TILDE_VERSION, stateName, st.sampleRate, st.bufLength,
 	         x->maxvec, st.numUnits, st.degraded ? "yes" : "no",
 	         st.scVersion.empty() ? "?" : st.scVersion.c_str());
+	/* Bug #29: `queued` does not include the eval IN FLIGHT (the worker pops it
+	   before running) ⇒ `busy` is the one that answers "is sclang answering?". */
+	char busy[48];
+	if (st.busyMs == 0)
+		snprintf(busy, sizeof(busy), "no");
+	else
+		snprintf(busy, sizeof(busy), "%ldms%s", st.busyMs, st.stuck ? " (STUCK)" : "");
 	sc3_post(x, "  sr=%s dsp=%s pumped=%ld blocks (cumulative, DSP off only) lag=%ld "
-	            "console=%s queued=%ld",
+	            "console=%s queued=%ld busy=%s",
 	         st.sampleRateFromHost ? "project (DSP chain)" : "s.options",
 	         dspOn ? "on" : "off", eng.pumpedBlocks(), eng.pumpLagBlocks(),
-	         x->console_on ? "on" : "off", eng.queuedJobs());
+	         x->console_on ? "on" : "off", eng.queuedJobs(), busy);
 	sc3_post(x, "  s.options: maxNodes=%ld memSize=%ldKB buses=%ld blockSize=%ld maxLogins=%ld",
 	         st.maxNodes, st.memSizeKB, st.numAudioBusChannels, st.blockSize, st.maxLogins);
 	/* 4.x: World port. With 0 (default) the kernel picks it: that is what makes
@@ -516,6 +526,25 @@ static bool sc3_require_engine(t_sc3 *x, const char *what)
 	return false;
 }
 
+/* Bug #29: sclang has no preemption, so an eval that loops (e.g. a Number
+   `nextTimeOnGrid` with an Array as clock — see handoff #29) never returns. Any
+   `eval` queued behind it would never run, so it is dropped with a visible error
+   instead of piling up in silence (this is what looked like "sc3~ stopped
+   answering"). Panic/close are NOT dropped: their SC side is queued too, and the
+   local gain ramp is what actually silences the audio. */
+static bool sc3_engine_stuck(t_sc3 *x, const char *what)
+{
+	Sc3Engine &eng = Sc3Engine::instance();
+	if (!eng.evalStuck())
+		return false;
+	std::string msg = std::string(what) + ": dropped — sclang is still inside a "
+		"previous eval (" + std::to_string(eng.evalBusyMs() / 1000) +
+		" s, it cannot be interrupted). Restart Max.";
+	object_error((t_object *)x, "sc3~: %s", msg.c_str());
+	sc3_emit(x, x->out_err, "error", msg.c_str());
+	return true;
+}
+
 static void sc3_open(t_sc3 *x)
 {
 	// After a failed boot (port busy, broken library…) the engine was left in
@@ -565,6 +594,17 @@ static void sc3_close(t_sc3 *x)
 {
 	if (!x->opened) {
 		sc3_note(x, "close: was not open");
+		return;
+	}
+	/* Bug #29: with sclang stuck inside an eval, teardown would join a thread that
+	   never returns ⇒ Max frozen on `close`. Same rule as `eval`: say it and drop
+	   it (the engine is unrecoverable; restart Max). */
+	if (Sc3Engine::instance().evalStuck()) {
+		std::string msg = "close: sclang is stuck in an eval (" +
+		                  std::to_string(Sc3Engine::instance().evalBusyMs() / 1000) +
+		                  " s, it cannot be interrupted) — restart Max";
+		object_error((t_object *)x, "sc3~: %s", msg.c_str());
+		sc3_emit(x, x->out_err, "error", msg.c_str());
 		return;
 	}
 	if (Sc3Engine::instance().isBooting())
@@ -649,6 +689,8 @@ static void sc3_send(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 	(void)s; // selector = "send"
 	if (!sc3_require_engine(x, "send"))
 		return;
+	if (sc3_engine_stuck(x, "send"))
+		return;
 	if (argc < 1) {
 		sc3_emit(x, x->out_err, "error", "send: missing the SC message (e.g. send s.boot)");
 		return;
@@ -685,6 +727,8 @@ static void sc3_eval(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 	(void)s;
 	if (!sc3_require_engine(x, "eval"))
 		return;
+	if (sc3_engine_stuck(x, "eval"))
+		return;
 	// [textedit] sends `text <buffer>`. If the Max container did not drop the
 	// selector (e.g. with outputmode 1 the buffer travels as ONE symbol and
 	// "text" arrives as the first argument), we skip it: no valid SC line starts
@@ -720,6 +764,8 @@ static void sc3_set(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 {
 	(void)s; // selector = "set"
 	if (!sc3_require_engine(x, "set"))
+		return;
+	if (sc3_engine_stuck(x, "set"))
 		return;
 	// 1 target + N key/value pairs. Anything else is a typo, not a parameter
 	// change (and it keeps us away from the generic `set <value>` that Max
@@ -762,6 +808,8 @@ static void sc3_set(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 static void sc3_evalfile(t_sc3 *x, t_symbol *s)
 {
 	if (!sc3_require_engine(x, "evalfile"))
+		return;
+	if (sc3_engine_stuck(x, "evalfile"))
 		return;
 	if (!s || !s->s_name || !s->s_name[0]) {
 		sc3_emit(x, x->out_err, "error", "evalfile: missing the path");
@@ -958,6 +1006,25 @@ static void sc3_flush(t_sc3 *x)
 				x->opened = false;
 				x->boot_seen = 0;
 			}
+		}
+
+		/* Bug #29: watchdog for an eval that never returns. The VM cannot be
+		   interrupted (the embedded client has no SIGINT/hook), so the least we owe
+		   the user is to SAY it — once per eval — instead of looking dead while sclang
+		   burns memory. */
+		if (st.stuck) {
+			if (!x->stuck_warned) {
+				x->stuck_warned = 1;
+				std::string msg =
+				    "eval has been running for " + std::to_string(st.busyMs / 1000) +
+				    " s and has not returned: sclang CANNOT be interrupted (the code is "
+				    "probably looping). Audio and the World still work, but new evals are "
+				    "dropped — restart Max. `info` shows busy=…";
+				object_error((t_object *)x, "sc3~: %s", msg.c_str());
+				sc3_emit(x, x->out_err, "error", msg.c_str());
+			}
+		} else if (st.busyMs == 0) {
+			x->stuck_warned = 0;
 		}
 	} else {
 		x->boot_seen = 0;
