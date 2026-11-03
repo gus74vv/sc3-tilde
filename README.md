@@ -6,7 +6,7 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.15.2 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc3~` | 0.15.3 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
 | `sc_code` | 0.9.7 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
@@ -39,8 +39,8 @@ at boot with a real error instead of leaving a silent engine.
 
 1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the
    **User Library** (`~/Documents/Max 9/Library`) is always in the path.
-2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Help`. Or don't copy
-   them at all. They are low-quality slop created with a Python script. Refer to
+2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into a folder named `help` inside one of
+   Max's search paths — the User Library's is `~/Documents/Max 9/Library/help`. Refer to
    example.maxpat for a shorter and more practical explanation.
 3. **Restart Max** (`.mxo` files are loaded when the app starts).
 
@@ -276,11 +276,11 @@ the body (caret at the end, a single undo step) and **nothing is evaluated** —
 is left untouched and Max's console lists the keys that are available.
 
 The release ships a working example: `examples/sc_code-snippets.txt`, four `Ndef`s (`\a` …
-`\d`, keys `1` … `4`). Their `.clock_(t)` points at the one-letter interpreter variable
-`t`, nil unless you assign it — and a nil clock means `TempoClock.default` (NodeProxy:
-`clock ? TempoClock.default`), so nothing has to be set up first. Each body ends with
-`Ndef(\a).clear(10)`. Load it with `snippets <path to the file>` and try `snip.1` …
-`snip.4`.
+`\d`, keys `1` … `4`). Each body ends with `Ndef(\a).clear(10)` and plays with a plain
+`.fadeTime_(6).play`: no clock and no quantization, because the one-letter interpreter
+variables (`a` … `z`) are shared by every eval in the session — poking one from another
+block silently retunes (or breaks) every `Ndef` in the patch. Nothing has to be set up
+first; load it with `snippets <path to the file>` and try `snip.1` … `snip.4`.
 
 ## Known limits
 
@@ -363,5 +363,7 @@ GPL-3.0-only — see [LICENSE](LICENSE). The engine links SuperCollider's static
 published with every release.
 
 ## Support
+
+A little coffee goes a long way.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T0W629WR81)
