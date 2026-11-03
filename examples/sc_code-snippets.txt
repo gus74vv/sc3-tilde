@@ -24,7 +24,7 @@ Ndef(\a, {
 	LocalOut.ar(l/3);
 	l!2
 } * -20.dbamp
-).clock_(t).quant_(1).fadeTime_(6).play;
+).fadeTime_(6).play;
 )
 Ndef(\a).clear(10)
 
@@ -46,7 +46,7 @@ Ndef(\b, {
 		0.3
 	)
 } * -20.dbamp
-).clock_(t).quant_(1).fadeTime_(6).play
+).fadeTime_(6).play
 )
 Ndef(\b).clear(10)
 
@@ -61,7 +61,7 @@ Ndef(\c, {
 		)
 	)*0.1
 } * -20.dbamp
-).clock_(t).quant_(1).fadeTime_(10).play;
+).fadeTime_(10).play;
 )
 Ndef(\c).clear(10)
 
@@ -78,6 +78,6 @@ Ndef(\d,{
 		}.sum(200)
 	}!2
 } * -20.dbamp
-).clock_(t).quant_(1).fadeTime_(10).play;
+).fadeTime_(10).play;
 )
 Ndef(\d).clear(10)
