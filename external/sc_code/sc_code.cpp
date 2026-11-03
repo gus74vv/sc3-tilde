@@ -62,7 +62,8 @@
 #include "sc_snip.h"
 #include "sc_wrap.h"
 
-/* 0.9.7 (S6c+): COMPLETION in the bar, AUTOMATIC and display-only. After three letters
+/* 0.9.8: the title bar reads "sclang" (it is the language editor, not a file).
+ * 0.9.7 (S6c+): COMPLETION in the bar, AUTOMATIC and display-only. After three letters
  * of a token (`Sin`) the bar shows the best candidate and `n/N`; `Tab` inserts it (one
  * undo step), `⇧Tab` cycles, `⏎` is NEVER taken (it still evaluates / breaks the line) and
  * typing filters until nothing is left. After `Class.` the list is only the methods of
@@ -103,7 +104,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.7"
+#define SC_CODE_VERSION "0.9.8"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -116,7 +117,7 @@
 #define PAD_Y 4.
 #define BAR_W 7.    /* width of the vertical scroll bar (on the right) */
 #define GUTTER_GAP 8. /* breathing room to the right of the line numbers (S5b) */
-#define SC_TITLE_TEXT "sc.code" /* franja superior (S5c), alineada a la derecha */
+#define SC_TITLE_TEXT "sclang" /* top strip (S5c), right-aligned */
 
 /* `@wrap 0` (= no wrap) uses this cell width: each line stays in a single row, which
  * is exactly the behavior before S5e. */
@@ -168,7 +169,7 @@ typedef struct _sc_code {
 	t_clock *autowrite_clock;   /* debounce del autowrite */
 
 	/* --- S5c: title bar and bracket matching ------------------------------ */
-	long titlebar;              /* 1 = franja superior con "sc.code" (default 1) */
+	long titlebar;              /* 1 = top strip with "sclang" (default 1) */
 	double title_h;             /* strip height in px (0 = no bar) */
 	long matchbrackets;         /* 1 = highlight the pair of the caret bracket */
 	t_jrgba matchcolor;         /* background of the bracket pair */

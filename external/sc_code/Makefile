@@ -150,7 +150,7 @@ $(B)/highlight_test: tests/highlight_test.cpp sc_highlight.cpp sc_highlight.h $(
 # but the code is the full editor. `sc_code` is pure UI: it links neither SC nor MSP
 # (every Max symbol is resolved by the host with -undefined dynamic_lookup).
 # Bundle version (keep it in sync with SC_CODE_VERSION in sc_code.cpp).
-SC_CODE_VER := 0.9.7
+SC_CODE_VER := 0.9.8
 
 $(B)/sc_code.mxo: $(UI_SRC) $(UI_HDR) bundle/Info.plist.in $(CORE_SRC) $(CORE_HDR) $(B)/jpatcher_syms.o
 	@mkdir -p $(B)/sc_code.mxo/Contents/MacOS
@@ -177,7 +177,9 @@ install: $(B)/sc_code.mxo install-help
 	@echo "installed: $(MAX_LIBRARY)/sc_code.mxo"
 
 # Help: Max looks it up by name in the search path (alt-click on the object).
-MAX_HELP ?= $(HOME)/Documents/Max 9/Help
+# That folder is `help` inside a search path, i.e. ~/Documents/Max 9/Library/help;
+# ~/Documents/Max 9/Help is NOT in the search path (see README, install step 2).
+MAX_HELP ?= $(MAX_LIBRARY)/help
 
 install-help:
 	@mkdir -p "$(MAX_HELP)"

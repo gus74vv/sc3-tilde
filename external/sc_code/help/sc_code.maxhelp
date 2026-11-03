@@ -20,7 +20,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 20.0, 15.0, 760.0, 19.0 ],
-                    "text": "sc_code — in-patch sclang code editor for sc3~  (0.9.7)"
+                    "text": "sc_code — in-patch sclang code editor for sc3~  (0.9.8)"
                 }
             },
             {
