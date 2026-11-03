@@ -39,8 +39,7 @@ at boot with a real error instead of leaving a silent engine.
 
 1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the
    **User Library** (`~/Documents/Max 9/Library`) is always in the path.
-2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into a folder named `help` inside one of
-   Max's search paths — the User Library's is `~/Documents/Max 9/Library/help`. Refer to
+2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Library/help`. Refer to
    example.maxpat for a shorter and more practical explanation.
 3. **Restart Max** (`.mxo` files are loaded when the app starts).
 
