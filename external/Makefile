@@ -83,6 +83,16 @@ evalcheck: tests/eval_check.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDF
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) \
 	    tests/eval_check.cpp Sc3Engine.cpp -o build/eval_check $(SC_LIBS)
 
+# Bug #29 (diagnostic, not part of the gate): evaluates a LIST of .scd files in the
+# embedded engine and says whether each one returned or left sclang stuck. The
+# engine's eval is not preemptible, so the only way to tell "still running" from
+# "looping forever" is a canary eval behind it (`info`'s busy= uses the same data).
+#   ./build/tvar_repro a.scd b.scd …
+tvarrepro: tests/tvar_repro.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFILE)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) \
+	    tests/tvar_repro.cpp Sc3Engine.cpp -o build/tvar_repro $(SC_LIBS)
+
 # Alternative fixture (SC3_CL_DIR=build/cl) to compare against stock+copy.
 compat:
 	rm -rf "$(CLDIR)"
