@@ -62,7 +62,12 @@
 #include "sc_snip.h"
 #include "sc_wrap.h"
 
-/* 0.9.9: drops insert the ABSOLUTE path (`"/Users/g/…/x.wav"`, volume prefix gone, no
+/* 0.9.10 (S6b): evaluating `snip.KEY` posts the KEY to the Max console as
+ * `-> kick` (sclang's "result" arrow + the key as written in the file, no `snip.`
+ * prefix and no `sc_code:` object prefix: plain `post()`, not `object_post()`). The
+ * expansion is otherwise SILENT — no `eval` leaves the box, so nothing shows up
+ * anywhere — and the console is the only confirmation of WHICH snippet just ran.
+ * 0.9.9: drops insert the ABSOLUTE path (`"/Users/g/…/x.wav"`, volume prefix gone, no
  * `~` — sclang does not expand it) and `@snippets` / the `snippets <path>` message take
  * the path with or without one pair of quotes (`'…'` or `"…"`).
  * 0.9.8: the title bar reads "sclang" (it is the language editor, not a file).
@@ -107,7 +112,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.9"
+#define SC_CODE_VERSION "0.9.10"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -518,7 +523,10 @@ static void sc_code_snip_maybe_reload(t_sc_code *x) {
 /* Replaces the evaluated range with the snippet body: text ONLY — nothing is
  * evaluated and no `eval` is emitted —, caret at the end, one undo step. If the key
  * is missing (or the file could not be read) the buffer is not touched and a notice
- * goes to the Max console. */
+ * goes to the Max console. On success it posts the key that ran (0.9.10) as
+ * `-> key`: the sclang look, with no object prefix (`post()`) and no counters. The
+ * expansion is silent in every other way, so the console is the only trace of WHICH
+ * snippet was inserted. */
 static void sc_code_snip_expand(t_sc_code *x, const sc_code::EvalSpan &span, const std::string &key) {
 	sc_code_snip_maybe_reload(x);
 	ScSnipState *st = x->snips;
@@ -548,6 +556,9 @@ static void sc_code_snip_expand(t_sc_code *x, const sc_code::EvalSpan &span, con
 	sc_code_after_key(x, line_before);
 	if (x->autowrite && x->buf->length() != len_before)
 		sc_code_autowrite_poke(x);
+	/* `post()` (not `object_post()`): no "sc_code:" prefix, so it reads like the sclang
+	 * post window. The arrow is sclang's "=> result" marker. */
+	post("-> %s", key.c_str());
 	jbox_redraw(&x->j_box);
 }
 

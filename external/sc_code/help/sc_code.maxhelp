@@ -157,7 +157,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 461.5, 302.0, 267.0, 147.0 ],
-                    "text": "SNIPPETS: `snippets <path>` (or @snippets, saved with the patch) loads a file of `### key` blocks plus verbatim code, no escapes — the release ships examples/sc_code-snippets.txt. The path can be relative, absolute, start with ~, and keep one pair of quotes (snippets '~/x y.txt' works). With the file loaded, evaluating `snip.key` REPLACES the text with the snippet and does NOT send eval to the engine (nothing is evaluated): the next ⌘⏎ does. It re-reads the file by itself when the mtime or the size changes."
+                    "text": "SNIPPETS: `snippets <path>` (or @snippets, saved with the patch) loads a file of `### key` blocks plus verbatim code, no escapes — the release ships examples/sc_code-snippets.txt. The path can be relative, absolute, start with ~, and keep one pair of quotes (snippets '~/x y.txt' works). With the file loaded, evaluating `snip.key` REPLACES the text with the snippet and does NOT send eval to the engine (nothing is evaluated): the next ⌘⏎ does. It re-reads the file by itself when the mtime or the size changes. Each expansion posts the key that ran to the Max console as `-> kick` (the sclang look, no `sc_code:` prefix): since no eval leaves the box, that is the only confirmation of which snippet was inserted."
                 }
             },
             {
