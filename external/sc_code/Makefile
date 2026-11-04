@@ -150,7 +150,7 @@ $(B)/highlight_test: tests/highlight_test.cpp sc_highlight.cpp sc_highlight.h $(
 # but the code is the full editor. `sc_code` is pure UI: it links neither SC nor MSP
 # (every Max symbol is resolved by the host with -undefined dynamic_lookup).
 # Bundle version (keep it in sync with SC_CODE_VERSION in sc_code.cpp).
-SC_CODE_VER := 0.9.8
+SC_CODE_VER := 0.9.9
 
 $(B)/sc_code.mxo: $(UI_SRC) $(UI_HDR) bundle/Info.plist.in $(CORE_SRC) $(CORE_HDR) $(B)/jpatcher_syms.o
 	@mkdir -p $(B)/sc_code.mxo/Contents/MacOS

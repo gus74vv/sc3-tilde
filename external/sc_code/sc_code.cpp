@@ -62,7 +62,10 @@
 #include "sc_snip.h"
 #include "sc_wrap.h"
 
-/* 0.9.8: the title bar reads "sclang" (it is the language editor, not a file).
+/* 0.9.9: drops insert the ABSOLUTE path (`"/Users/g/…/x.wav"`, volume prefix gone, no
+ * `~` — sclang does not expand it) and `@snippets` / the `snippets <path>` message take
+ * the path with or without one pair of quotes (`'…'` or `"…"`).
+ * 0.9.8: the title bar reads "sclang" (it is the language editor, not a file).
  * 0.9.7 (S6c+): COMPLETION in the bar, AUTOMATIC and display-only. After three letters
  * of a token (`Sin`) the bar shows the best candidate and `n/N`; `Tab` inserts it (one
  * undo step), `⇧Tab` cycles, `⏎` is NEVER taken (it still evaluates / breaks the line) and
@@ -104,7 +107,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.8"
+#define SC_CODE_VERSION "0.9.9"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -400,9 +403,13 @@ static void sc_code_autowrite_tick(t_sc_code *x) { sc_code_write_file(x); }
  * autowrite). */
 static void sc_code_after_key(t_sc_code *x, int line_before);
 
-/* `~` ⇒ $HOME; the rest is used as is (absolute, or relative to the Max cwd). */
+/* `~` ⇒ $HOME and one pair of surrounding quotes (`'…'` or `"…"`) removed; the rest
+ * is used as is (absolute, or relative to the Max cwd). The quotes are the ones a
+ * message box keeps verbatim — `snippets '~/x.txt'` arrives with them, and Max only
+ * strips double quotes, and only while parsing the box — so they are dropped here
+ * instead of failing the open. Same path for `@indexfile`. */
 static std::string sc_code_expand_path(const char *path) {
-	std::string p(path ? path : "");
+	const std::string p = sc_code::unquote_path(path ? path : "");
 	if (p == "~" || (p.size() > 1 && p[0] == '~' && p[1] == '/')) {
 		if (const char *home = getenv("HOME"))
 			return std::string(home) + p.substr(1);
@@ -549,7 +556,9 @@ static void sc_code_snip_expand(t_sc_code *x, const sc_code::EvalSpan &span, con
  * snippets (the dict is dropped). The path arrives as ONE symbol from the patch
  * (`@snippets "/path with spaces"`), but a message box splits the text on spaces:
  * they are joined back so that `snippets ~/Documents/Max
- * 9/Library/sc_code-snippets.txt` works. */
+ * 9/Library/sc_code-snippets.txt` works. Quotes survive that join (`snippets
+ * '~/Documents/Max 9/Library/x.txt'`) and are removed when the path is opened
+ * (`sc_code_expand_path`). */
 static t_max_err sc_code_set_snippets(t_sc_code *x, t_object *attr, long argc, t_atom *argv) {
 	std::string path;
 	for (long i = 0; i < argc && argv; ++i) {
@@ -569,8 +578,11 @@ static t_max_err sc_code_set_snippets(t_sc_code *x, t_object *attr, long argc, t
 		x->snips->size = 0;
 		return MAX_ERR_NONE;
 	}
-	x->snipfile = gensym(path.c_str());
-	sc_code_snip_load(x, path.c_str(), true);
+	/* What gets STORED (and saved with the patch) is the path without its quotes; the
+	 * `~` is kept so the patch stays portable. */
+	const std::string stored = sc_code::unquote_path(path);
+	x->snipfile = gensym(stored.c_str());
+	sc_code_snip_load(x, stored.c_str(), true);
 	return MAX_ERR_NONE;
 }
 
@@ -797,8 +809,11 @@ static void sc_code_scrollspeed_msg(t_sc_code *x, double v) {
  *
  * `dropfile.mxo` (the only stock external that also registers `candropfiles` /
  * `dropfiles`) confirmed the atom layout, but those two never fired on a box drop;
- * the accepted-drag pair does. Shortening to `~` and quoting live in `sc_path.cpp`
- * (headless, gated); the insertion uses the typing path ⇒ a single undo step. */
+ * the accepted-drag pair does. Dropping the volume prefix, expanding `~` and quoting
+ * live in `sc_path.cpp` (headless, gated) ⇒ what lands at the caret is an ABSOLUTE
+ * path (`"/Users/g/…/x.wav"`): sclang does not expand `~`, and a path you can paste
+ * into `SoundFile.openRead` without editing it is the point. The insertion uses the
+ * typing path ⇒ a single undo step. */
 static void sc_code_insert_drop(t_sc_code *x, const std::vector<std::string> &names) {
 	if (names.empty() || x->readonly || !x->buf)
 		return;

@@ -157,7 +157,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 461.5, 302.0, 267.0, 147.0 ],
-                    "text": "SNIPPETS: `snippets <path>` (or @snippets, saved with the patch) loads a file of `### key` blocks plus verbatim code, no escapes — the release ships examples/sc_code-snippets.txt. With the file loaded, evaluating `snip.key` REPLACES the text with the snippet and does NOT send eval to the engine (nothing is evaluated): the next ⌘⏎ does. It re-reads the file by itself when the mtime or the size changes."
+                    "text": "SNIPPETS: `snippets <path>` (or @snippets, saved with the patch) loads a file of `### key` blocks plus verbatim code, no escapes — the release ships examples/sc_code-snippets.txt. The path can be relative, absolute, start with ~, and keep one pair of quotes (snippets '~/x y.txt' works). With the file loaded, evaluating `snip.key` REPLACES the text with the snippet and does NOT send eval to the engine (nothing is evaluated): the next ⌘⏎ does. It re-reads the file by itself when the mtime or the size changes."
                 }
             },
             {
@@ -168,7 +168,7 @@
                     "numoutlets": 1,
                     "outlettype": [ "" ],
                     "patching_rect": [ 465.0, 266.0, 260.0, 22.0 ],
-                    "text": "snippets ~/path/to/my_snippets.txt"
+                    "text": "snippets '~/path with spaces/my_snippets.txt'"
                 }
             },
             {
@@ -181,7 +181,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 20.0, 211.0, 420.0, 71.0 ],
-                    "text": "DROP: a file dragged from the Finder onto the box lands as its quoted path at the caret (\"~/Documents/x.wav\"), one undo step, with the patcher locked or unlocked. sclang does not expand ~: use \"~\".standardizePath or an absolute path if the text is going to be evaluated."
+                    "text": "DROP: a file dragged from the Finder onto the box lands as its quoted ABSOLUTE path at the caret (\"/Users/you/Documents/x.wav\"), one undo step, with the patcher locked or unlocked. Absolute on purpose: sclang does not expand ~, so this text goes into SoundFile.openRead as it is."
                 }
             },
             {

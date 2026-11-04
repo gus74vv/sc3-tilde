@@ -6,8 +6,8 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.15.4 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
-| `sc_code` | 0.9.8 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
+| `sc3~` | 0.15.5 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc_code` | 0.9.9 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
  ┌─────────┐  eval <code>       ┌────────┐
@@ -247,6 +247,10 @@ left to you: the default arguments are not in the index.
 `@snippets <path>` (or the `snippets <path>` message) points the editor at a plain-text
 file of blocks. The path is saved with the patch, and the file is re-read by
 `mtime`/`size` every time you use it — if it disappears, the copy already loaded stays.
+
+Relative, absolute and `~` paths all work, and one pair of quotes is accepted and
+stripped (`snippets '~/path with spaces/my.txt'`, `@snippets "~/x.txt"`), which is the
+only way to feed a path with spaces from a message box.
 
 ```text
 ### init
