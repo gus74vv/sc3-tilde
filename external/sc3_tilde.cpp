@@ -24,7 +24,8 @@
  *   array in `perform64` is [0]=ch0 (bus busoff), [1]=ch1, …
  *
  * Evaluated code receives `~sc3out` (base bus of THIS instance) and `~sc3n`
- * (channels): `Out.ar(~sc3out, sig)` or, directly, `Out.ar(4, sig)` with
+ * (channels), both in the topEnvironment: `Out.ar(~sc3out, sig)` or, directly,
+ * `Out.ar(4, sig)` with
  * `[sc3~ 2 4]`.
  *
  * Assets: the class library and the stock UGens come from the REAL
@@ -55,7 +56,7 @@
 
 #include "Sc3Engine.h"
 
-#define SC3_TILDE_VERSION "0.15.5"
+#define SC3_TILDE_VERSION "0.15.6"
 
 /* Local gain ramp (anti-click). 8 ms is inaudible as a fade and is enough for
    the cut not to be heard. SC's stop is queued AFTER the ramp reached
@@ -715,11 +716,18 @@ static void sc3_send(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
      Ndef(...).play              — .play takes ~sc3out (SCMaxCompat module)
    Note: it is sclang's topEnvironment, so it holds for the synchronous eval (what
    gets deferred to a Routine/clock sees the last evaluated value; there it is
-   better to pass the bus explicitly). */
+   better to pass the bus explicitly).
+   Bug #31: the setup writes to `topEnvironment` explicitly instead of `~sc3out = …`.
+   The `~x = v` sugar assigns into `currentEnvironment`, which SURVIVES between
+   evals: after `ProxySpace.push(s.boot)` in one eval, the setup of the NEXT one
+   landed inside that space, where LazyEnvir turns a missing key into a NodeProxy
+   ("\sc3out" with source = the bus number) instead of storing a number ⇒ the
+   space got polluted and `~sc3out` stopped being a bus. A `put` into
+   topEnvironment is unconditional and side-effect free. */
 static std::string sc3_ctx_setup(const t_sc3 *x)
 {
-	return "~sc3out = " + std::to_string(x->busoff) + "; ~sc3n = " +
-	       std::to_string(x->nchan) + ";";
+	return "topEnvironment.put(\\sc3out, " + std::to_string(x->busoff) +
+	       "); topEnvironment.put(\\sc3n, " + std::to_string(x->nchan) + ");";
 }
 
 static void sc3_eval(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
