@@ -6,7 +6,7 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.15.6 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc3~` | 0.15.7 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
 | `sc_code` | 0.9.11 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
@@ -294,6 +294,13 @@ message) and try `snip.1` … `snip.4`.
   patch. Use the `panic` message, or `⌃.` in `sc_code`.
 * **One expression per `eval`**: `( … )` for a block, but two sibling `( … )` blocks in one
   call is a parse error.
+* **Inside a pushed `ProxySpace`, `~sc3out` is not the bus.** There it is a JITLib
+  variable again, so `LazyEnvir` answers with a `NodeProxy` and `Out.ar(~sc3out, sig)`
+  is *silent* — no error, nodes are created. A bare `.play` / `.playN` is unaffected:
+  those read the bus from the interpreter's `topEnvironment`. Inside a space use
+  `~out.play`, `topEnvironment.at(\sc3out)`, or capture the bus before the `push`
+  (`b = ~sc3out; p = ProxySpace.push(s.boot); … Out.ar(b, sig)`). A `.play` deferred
+  from a `Routine` or a clock needs `out:` explicitly: the bus belongs to the eval.
 * `Buffer:setn` takes pairs: `setn(0, [ … ])`.
 * The user's `startup.scd` runs **twice** when the SC IDE is also open (one sclang per
   app). Harmless, but it explains duplicated posts.
