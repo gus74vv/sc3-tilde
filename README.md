@@ -7,7 +7,7 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 | object | version | what it is |
 |---|---|---|
 | `sc3~` | 0.15.6 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
-| `sc_code` | 0.9.9 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
+| `sc_code` | 0.9.11 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
  ┌─────────┐  eval <code>       ┌────────┐
@@ -245,8 +245,10 @@ left to you: the default arguments are not in the index.
 ### Snippets file
 
 `@snippets <path>` (or the `snippets <path>` message) points the editor at a plain-text
-file of blocks. The path is saved with the patch, and the file is re-read by
-`mtime`/`size` every time you use it — if it disappears, the copy already loaded stays.
+file of blocks. Type the path in Max's **object inspector** (the `@snippets` attribute) or
+send it as a message — either way the path is **saved with the patch**, so reopening the
+patch points the editor at the same file again. The file is re-read by `mtime`/`size`
+every time you use it — if it disappears, the copy already loaded stays.
 
 Relative, absolute and `~` paths all work, and one pair of quotes is accepted and
 stripped (`snippets '~/path with spaces/my.txt'`, `@snippets "~/x.txt"`), which is the
@@ -279,11 +281,8 @@ the body (caret at the end, a single undo step) and **nothing is evaluated** —
 is left untouched and Max's console lists the keys that are available.
 
 The release ships a working example: `examples/sc_code-snippets.txt`, four `Ndef`s (`\a` …
-`\d`, keys `1` … `4`). Each body ends with `Ndef(\a).clear(10)` and plays with a plain
-`.fadeTime_(6).play`: no clock and no quantization, because the one-letter interpreter
-variables (`a` … `z`) are shared by every eval in the session — poking one from another
-block silently retunes (or breaks) every `Ndef` in the patch. Nothing has to be set up
-first; load it with `snippets <path to the file>` and try `snip.1` … `snip.4`.
+`\d`, keys `1` … `4`). Nothing has to be set up first; point the editor at it (inspector or
+message) and try `snip.1` … `snip.4`.
 
 ## Known limits
 
