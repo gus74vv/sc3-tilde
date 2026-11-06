@@ -112,7 +112,7 @@
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
  * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.10"
+#define SC_CODE_VERSION "0.9.11"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -1940,12 +1940,12 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 		jgraphics_fill(g);
 	}
 
-	/* empty text: placeholder with the shortcuts (shorter if it does not
-	 * fit) */
+	/* empty text: placeholder with the shortcuts. The name of the language is
+	 * NOT repeated here: the title bar already says it (0.9.11). */
 	if (buf.length() == 0) {
 		jgraphics_set_source_rgba(g, x->textcolor.red, x->textcolor.green, x->textcolor.blue, 0.45);
 		jgraphics_move_to(g, text_x, x->title_h + PAD_Y + x->ascent);
-		jgraphics_show_text(g, "sclang…  ⇧⏎ line · ⌘⏎ region · ⌘⇧⏎ all · ⌃. panic");
+		jgraphics_show_text(g, "⇧⏎ line · ⌘⏎ region · ⌘⇧⏎ all · ⌃. panic");
 	}
 
 	jgraphics_restore(g);
