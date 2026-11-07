@@ -10,6 +10,7 @@
 //   4. readServerOptions()                // s.options are ALREADY configured
 //   5. World_New + World_SetSampleRate + World_Start
 //   6. deterministic adoption: serverRunning + sendDefaultGroups + notified
+//      (+ `/status`, so sclang learns the World's sample rate)
 //   7. ready = true  → from here on only the audio thread touches the World
 
 #include "Sc3Engine.h"
@@ -42,6 +43,7 @@
 #include "SC_Version.hpp"        // SC_VersionString() del sclang compilado
 #include "SC_World.h"
 #include "SC_WorldOptions.h"
+#include "scsynthsend.h" // small_scpacket (the /status.reply we write ourselves)
 
 // World API outside the public headers: C++ (mangled) linkage, same as in
 // phase1/test_world.cpp. Do not declare inside extern "C".
@@ -228,6 +230,117 @@ static bool packetClearsSched(const char *data, int size)
 		off += elemsz;
 	}
 	return false;
+}
+
+// --- /status: answered by the engine, never by the World -------------------
+// scsynth's AudioStatusCmd::Stage2 asks the audio driver for the CPU meters and
+// the sample rate before replying (SC_SequencedCommand.cpp:1162). Our World is
+// born with mRealTime = false ⇒ hw->mAudioDriver is nullptr ⇒ ANY `/status`
+// (s.status, ServerStatusWatcher's alive thread, DirtEvent's handshake…) was a
+// null dereference = SIGSEGV inside the Max process. It is answered here instead,
+// with scsynth's exact `/status.reply` layout and the World's real sample rate,
+// and the World never sees the message.
+static bool oscIsStatus(const char *data, int size)
+{
+	static const char kAddr[] = "/status";
+	const int n = (int)sizeof(kAddr) - 1; // without the NUL
+	if (size < n + 1)
+		return false;
+	return std::memcmp(data, kAddr, (size_t)n) == 0 && data[n] == '\0';
+}
+
+// Is there a /status at any bundle depth? No allocation: for virtually every
+// packet the answer is "no" and it goes to the World untouched (no malloc in
+// the audio thread).
+static bool packetHasStatus(const char *data, int size)
+{
+	if (size < 8)
+		return false;
+	if (std::memcmp(data, "#bundle\0", 8) != 0)
+		return oscIsStatus(data, size);
+	int off = 16;
+	while (off + 4 <= size) {
+		int32_t raw = 0;
+		std::memcpy(&raw, data + off, 4);
+		const int elemsz = (int)ntohl((uint32_t)raw);
+		off += 4;
+		if (elemsz <= 0 || off + elemsz > size)
+			break;
+		if (packetHasStatus(data + off, elemsz))
+			return true;
+		off += elemsz;
+	}
+	return false;
+}
+
+// Copy the packet to `out` WITHOUT its /status messages (bundles are walked
+// recursively) and report how many were dropped. Only reached when
+// packetHasStatus() said yes, so the vectors never allocate on the hot path.
+static int stripStatus(const char *data, int size, std::vector<char> &out)
+{
+	if (!(size >= 16 && std::memcmp(data, "#bundle\0", 8) == 0)) {
+		if (!oscIsStatus(data, size)) {
+			out.insert(out.end(), data, data + size);
+			return 0;
+		}
+		return 1;
+	}
+	std::vector<char> body;
+	int dropped = 0;
+	int off = 16;
+	while (off + 4 <= size) {
+		int32_t raw = 0;
+		std::memcpy(&raw, data + off, 4);
+		const int elemsz = (int)ntohl((uint32_t)raw);
+		off += 4;
+		if (elemsz <= 0 || off + elemsz > size)
+			break;
+		std::vector<char> elem;
+		const int d = stripStatus(data + off, elemsz, elem);
+		dropped += d;
+		off += elemsz;
+		// A nested bundle left with zero messages is tag + timetag only: dropping
+		// it leaves the packet exactly as if it had never carried a /status.
+		if (d > 0 && elem.size() <= 16)
+			continue;
+		body.insert(body.end(), (const char *)&raw, (const char *)&raw + 4);
+		body.insert(body.end(), elem.begin(), elem.end());
+	}
+	out.insert(out.end(), data, data + 16); // "#bundle\0" + timetag
+	out.insert(out.end(), body.begin(), body.end());
+	return dropped;
+}
+
+// ",iiiiiffdd" (9 args), same order as scsynth: audio-active, units, graphs,
+// groups, synthdefs, avgCPU, peakCPU, sampleRate, actualSampleRate.
+// CPU meters are 0 (there is no driver to measure); the sr and the counts are the
+// World's. numSynthDefs stays 0: the table lives in HiddenWorld (mGraphDefLib),
+// which this TU does not include.
+static void sendStatusReply(int sock, const struct sockaddr_in &peer, World *w)
+{
+	if (sock < 0 || !w)
+		return;
+	small_scpacket packet;
+	packet.adds("/status.reply");
+	packet.maketags(10);
+	packet.addtag(',');
+	for (int i = 0; i < 5; ++i)
+		packet.addtag('i');
+	packet.addtag('f');
+	packet.addtag('f');
+	packet.addtag('d');
+	packet.addtag('d');
+	packet.addi(1); // audio is always active
+	packet.addi((int)w->mNumUnits);
+	packet.addi((int)w->mNumGraphs);
+	packet.addi((int)w->mNumGroups);
+	packet.addi(0);   // synthdefs (see above)
+	packet.addf(0.f); // avgCPU
+	packet.addf(0.f); // peakCPU
+	packet.addd(w->mSampleRate);
+	packet.addd(w->mSampleRate);
+	sendto(sock, packet.data(), packet.size(), 0,
+	       reinterpret_cast<const struct sockaddr *>(&peer), sizeof(peer));
 }
 
 int bindUdp(int port)
@@ -507,6 +620,19 @@ struct Sc3Engine::Impl {
 
 	void perform(const struct sockaddr_in &from, char *data, int size, bool isBundle)
 	{
+		/* `/status` would SIGSEGV inside the World (no audio driver, see
+		   sendStatusReply): answer it here and forward the rest of the packet. */
+		if (packetHasStatus(data, size)) {
+			std::vector<char> filtered;
+			const int dropped = stripStatus(data, size, filtered);
+			if (dropped > 0)
+				sendStatusReply(sock, from, world.load());
+			if (filtered.empty())
+				return;
+			data = filtered.data();
+			size = (int)filtered.size();
+			isBundle = size >= 16 && std::memcmp(data, "#bundle\0", 8) == 0;
+		}
 		/* bug #22: `/clearSched` (Server:freeAll → CmdPeriod.run) has to drop the
 		   bundles waiting for a future timetag HERE, because they are not in the
 		   World's scheduler (see packetClearsSched). Order matters: clear first,
@@ -1087,6 +1213,14 @@ struct Sc3Engine::Impl {
 		    "  ServerTree.run(s);\n"
 		    "  s.statusWatcher.notified = true;\n"
 		    "  s.changed(\\serverRunning);\n"
+		    // scsynth parity: a booted server answers /status, and that is where
+		    // ServerStatusWatcher gets the sample rate from (s.sampleRate, s.numUGens…).
+		    // The OSCFunc has to be registered by hand: the engine never calls
+		    // Server:boot, so startAliveThread/addStatusWatcher are not run.
+		    // Without this s.sampleRate stays nil and e.g. SuperDirt's
+		    // DirtOrbit:init dies on `8 / server.sampleRate`.
+		    "  s.statusWatcher.addStatusWatcher;\n"
+		    "  s.sendMsg(\\status);\n"
 		    "}, AppClock);");
 
 		auto waitRunning = [&](int ms) {
@@ -1121,7 +1255,9 @@ struct Sc3Engine::Impl {
 			// Synth() to have its group 1 and for s.serverRunning to be true.
 			client->evaluate("s.statusWatcher.serverRunning = true;\n"
 			                 "s.sendDefaultGroups;\n"
-			                 "s.statusWatcher.notified = true;");
+			                 "s.statusWatcher.notified = true;\n"
+			                 "s.statusWatcher.addStatusWatcher;\n"
+			                 "s.sendMsg(\\status);");
 			running = waitRunning(1000);
 		}
 		st.serverRunning = running;
