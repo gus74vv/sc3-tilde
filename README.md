@@ -170,42 +170,6 @@ With `[sc3~ @ins 2]`, inlets 2 and 3 are audio: `SoundIn.ar(0)` and `SoundIn.ar(
 them. Only one object per World owns the input ring, and the path adds two blocks of
 latency by design (the ring is prefilled with silence).
 
-### SuperDirt
-
-SuperDirt runs on top of `sc3~` (its quarks compile in the engine's sclang, its ~265
-SynthDefs load into the World, samples read through `/b_allocRead` and play on the
-instance's buses). Start it from a `sc_code` block / `eval`, not from `startup.scd`:
-there the World does not exist yet. Two ready-to-play files: **`examples/superdirt.scd`**
-(the minimal path: kit, beat, effects, melody) and **`examples/superdirt-generative.scd`**
-(upstream's `hacks/sclang-dirt.scd` sketchbook ported: generative bank picking, filter
-sweeps, vowels, random effect chains). Load either in `sc_code` and evaluate block by
-block. The `type: \dirt` route needs no OSC at all:
-
-```supercollider
-(
-~dirt = SuperDirt(2, s);
-SuperDirt.default = ~dirt;
-~dirt.loadSoundFiles([\bd, \hh, \cp, \sn].collect { |n|
-    "~/Library/Application Support/SuperCollider/downloaded-quarks/Dirt-Samples/".standardizePath +/+ n ++ "/" });
-~dirt.start(57122, [topEnvironment.at(\sc3out) ? 0]);
-Pdef(\x, Pbind(\type, \dirt, \orbit, 0, \s, \bd, \n, Pwhite(0, 3, inf), \dur, 0.25)).play;
-)
-```
-
-* **Samples**: `s.options.numBuffers` (1024 by default) counts **files**, so the full
-  Dirt-Samples bank (2522 files) needs it raised in `startup.scd` + `close`/`open`, or load
-  a subset. Folder paths passed as an array must end with `/`.
-* **Pick a free OSC port**: 57122 in the examples. Not 57120 (the SC IDE) and not 57121
-  — that one is this engine's sclang language port, so `start` fails to bind and posts a
-  harmless `Could not open UDP port 57121`. Nothing is lost: the in-language
-  `type: \dirt` path never goes through the socket, it is only what an OSC sender
-  (Tidal) would talk to.
-* **One SuperDirt per Max process**: sclang is shared by every `sc3~`. The orbit monitor
-  writes to `outBus`, so a second instance wants
-  `~dirt.start(57122, [topEnvironment.at(\sc3out)])` (with `~sc3out` of *that* instance).
-* **Driving it from Tidal** works if you point Tidal at that port (`57122`) and give it
-  the buses: `~dirt.start(57122, [0])`.
-
 ## `sc_code` reference
 
 Wire its outlet to `sc3~`'s message inlet: every evaluation leaves as a single
