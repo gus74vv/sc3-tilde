@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
-# sc3~ — SuperCollider inside Max
+# sc3~ — Supercollider inside Max
 
 Two Max externals that bring the SuperCollider engine and an SC-style code editor into a
 Max patch, with no external process, no IPC and no SuperCollider GUI:
