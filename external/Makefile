@@ -52,7 +52,7 @@ $(SANLINK): $(SNDFILE)
 	@mkdir -p $(dir $@)
 	ln -sf ../../../Frameworks/$(SNDFILE_NAME) $@
 
-.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test input_test loop_test fail_test evalcheck compat clean bundle sndfile
+.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test idle_cost input_test loop_test fail_test evalcheck compat clean bundle sndfile
 
 all: $(BIN)
 
@@ -92,6 +92,14 @@ tvarrepro: tests/tvar_repro.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDF
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) \
 	    tests/tvar_repro.cpp Sc3Engine.cpp -o build/tvar_repro $(SC_LIBS)
+
+# Diagnostic (not part of the gate): CPU cost of an attached engine with nothing to
+# evaluate, measured at the audio driver's pace.
+#   ./build/idle_cost [seconds] [port]
+idle_cost: tests/idle_cost.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFILE)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) \
+	    tests/idle_cost.cpp Sc3Engine.cpp -o build/idle_cost $(SC_LIBS)
 
 # Alternative fixture (SC3_CL_DIR=build/cl) to compare against stock+copy.
 compat:
