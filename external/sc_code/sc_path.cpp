@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_path.cpp — see sc_path.h (SCODE.md §12: Finder drops into `sc_code`;
- * §11: the `@snippets` path).
+/* sc_path.cpp — see sc_path.h (the design notes: Finder drops into `sc_code`;
+ * the `@snippets` path).
  *
  *     GPL v3 or later (see sc_path.h).
  */

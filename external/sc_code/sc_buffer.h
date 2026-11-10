@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_buffer.h — text buffer of the `sc_code` editor (S1, SCODE.md §4/§7.4).
+/* sc_buffer.h — text buffer of the `sc_code` editor (S1, the design notes).
  *
  * Own code (not a port): there is nothing equivalent and reusable in the SC IDE
  * (there the buffer is a full QTextDocument, with Qt inside).
@@ -56,7 +56,7 @@ class Buffer {
 	void set_text(const std::string &text);
 
 	/* Auto-close of pairs (S3). DEFAULT OFF (the SC IDE also has it off by
-	 * default, §3.11). The Max object turns it on. */
+	 * default). The Max object turns it on. */
 	void set_auto_close(bool on) { mAutoClose = on; }
 	bool auto_close() const { return mAutoClose; }
 
@@ -114,7 +114,7 @@ class Buffer {
 	bool backspace(); /* with auto-close: ⌫ between an empty pair deletes both */
 	bool delete_forward();
 	bool delete_selection();
-	bool insert_tab(int tabwidth); /* `tabwidth` spaces (§7.1 decision: Tab = spaces) */
+	bool insert_tab(int tabwidth); /* `tabwidth` spaces (decision: Tab = spaces) */
 	/* Return (S3): inserts "\n" + `indent`. If the text before the caret ends in `{ (
 	 * [` and there is a closer right after (with only spaces in between), the closer
 	 * moves to its own line with the indentation of the current line: `{}` with the
@@ -167,7 +167,7 @@ class Buffer {
 		int anchor;
 	};
 
-	/* What is being edited, for undo coalescing (SCODE.md §4 "per burst"). */
+	/* What is being edited, for undo coalescing (the design notes "per burst"). */
 	enum RunTag { RunNone = 0, RunInsert, RunBackspace, RunDelete };
 
 	void ensure_lines() const;

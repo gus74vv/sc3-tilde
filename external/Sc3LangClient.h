@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Sc3LangClient.h
-// Subclass of SC_LanguageClient for headless tests (Phase 1, external sc3~).
+// Subclass of SC_LanguageClient for headless tests (external sc3~).
 //
 // Reproduces the IDE REPL: a SINGLE long-lived sclang interpreter (not one per
 // evaluation). Evaluating code here keeps state across calls (global variables
@@ -64,7 +64,7 @@ public:
         // compileLibrary compiles the library and triggers Main.startup
         // (evaluates the user's startup file → IDE parity). The Main process is
         // created but its `s` (interpreter.s) is not mounted in the headless
-        // evaluation scope → we mount it by hand (see findings, HANDOFF §3.5).
+        // evaluation scope → we mount it by hand (see findings, the design notes).
         // compileLibrary() RETURNS compiledOK (PyrLexer.cpp): false if the class
         // library did not compile (e.g. a user quark with a syntax error).
         compileLibrary(withUserQuarks);
@@ -145,7 +145,7 @@ public:
     //
     // `port` is `Server.port`/`addr.port` (the port sclang sends commands to), not
     // `s.options.port`: ServerOptions has no `port` in SC 3.14 and asking for it
-    // posted an ERROR on every boot (leaving the bug #9 check in the fallback,
+    // posted an ERROR on every boot (leaving the check in the fallback,
     // i.e. dead).
     ServerOpts readServerOptions() {
         ServerOpts o;

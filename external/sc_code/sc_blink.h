@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_blink.h — blink of the evaluated block in `sc_code` (phase S5e, SCODE.md §7.18).
+/* sc_blink.h — blink of the evaluated block in `sc_code` (phase S5e, the design notes).
  *
  * User request: when evaluating (⌘⏎ / ⇧⏎ / ⌘⇧⏎) the evaluated block has to "blink" to
  * confirm WHAT was sent to sclang, with **selectable color and duration**.

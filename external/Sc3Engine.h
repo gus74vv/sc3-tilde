@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Sc3Engine.h — embedded SuperCollider engine (sclang + World) for the sc3~
 // external and for the headless tests. No Max dependencies: it compiles the same
-// way in `engine_test` (bare binary) and inside the bundle (Phase 2.3+).
+// way in `engine_test` (bare binary) and inside the bundle.
 //
-// Threading model (hard project rule, see AGENTS.md / PLAN.md):
+// Threading model (hard project rule, see the design notes):
 //
 //   thread               | owns                        | does
 //   ---------------------+-----------------------------+--------------------------------
@@ -13,7 +13,7 @@
 //   main (Max)           | nothing of the engine       | open/close/eval (enqueue), outlets
 //
 // During the boot the worker is the one touching the World (its own pump, same as
-// phase1/test_world): the audio thread does not see it yet because `ready` is
+// the world test): the audio thread does not see it yet because `ready` is
 // false and renderBlock() returns 0 without touching anything. When the boot ends
 // `ready` is published and from then on only the audio thread drains/renders;
 // `close()` waits until there are no renders in flight before destroying it.
@@ -117,7 +117,7 @@ struct Sc3EngineStatus {
 	std::string classLibraryDir; // effective Resource dir
 	std::string ugensPath;       // effective mUGensPluginPath
 
-	// Bug #29: the eval in flight (see Sc3Engine::evalBusyMs). `busyMs` = 0 when
+	// the eval in flight (see Sc3Engine::evalBusyMs). `busyMs` = 0 when
 	// sclang is idle; `stuck` = it already passed kEvalStuckMs (sclang cannot be
 	// interrupted: the code is looping).
 	long busyMs = 0;
@@ -148,9 +148,9 @@ public:
 	// OWNER, so a double `open` from the same object cannot leak a reference: with a
 	// plain counter it could, and then `close` never tore the World down — the engine
 	// stayed Ready (DSP still running) while the object said "closed", and the next
-	// `open` answered "already open" with no boot to show (bug #23).
+	// `open` answered "already open" with no boot to show.
 	//
-	// Phase 3.1: open() is ASYNCHRONOUS — it returns immediately (the sclang boot
+	// open() is ASYNCHRONOUS — it returns immediately (the sclang boot
 	// takes ~1–3 s and used to block Max's main thread). It returns false only if
 	// the engine was left Failed by a previous attempt (release() must be called
 	// before retrying). For UI-less code use waitReady().
@@ -175,7 +175,7 @@ public:
 	// used to look like "the object stopped answering".
 	const char *stateName() const;
 	long queuedJobs() const;
-	// Bug #29: an eval IN FLIGHT is not in `queue` (the worker pops it before
+	// an eval IN FLIGHT is not in `queue` (the worker pops it before
 	// running), so `queuedJobs() == 0` does not mean "sclang is idle". This is how
 	// long the current eval has been running (0 = nothing running right now) and
 	// whether it already passed kEvalStuckMs. The interpreter has NO preemption:
@@ -192,7 +192,7 @@ public:
 	void evalSilent(const std::string &code);
 	// evalWithSetup() = eval() but with a "setup" that runs BEFORE, in its own
 	// compile: the user text is compiled VERBATIM, just like in the SC IDE
-	// (bug #19: prefixing the setup breaks any block that starts with `var`,
+	// prefixing the setup breaks any block that starts with `var`,
 	// e.g. `( var x = 1; … )`). The two interprets are atomic with respect to each
 	// other (same worker job). The result printed is the user code's one.
 	void evalWithSetup(const std::string &setup, const std::string &code);
@@ -282,7 +282,7 @@ public:
 	long pumpLagBlocks() const;  // blocks the budget left unrun
 
 
-	// Shutting down the sclang VM (bug #13). Called from atexit: `release()` only
+	// Shutting down the sclang VM. Called from atexit: `release()` only
 	// drops the World/socket; the VM survives so the next `open` does not
 	// re-initialize the runtime (that crashes SC's VM).
 	void shutdownLang();

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_scroll.h — scroll vertical del editor `sc_code` (S5 adelantado).
  *
- * SCODE.md §5/§8: without scroll a document taller than the box is unusable, so it
+ * the design notes: without scroll a document taller than the box is unusable, so it
  * comes BEFORE S4. This module is **headless** (no Max, no jgraphics): geometry
  * only, so the arithmetic can be pinned in a test table (`tests/scroll_test.cpp`)
  * like it was done with the buffer and the indentation.

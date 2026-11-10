@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_complete.cpp — see sc_complete.h (S6c+, SCODE.md §10.6).
+/* sc_complete.cpp — see sc_complete.h (S6c+, the design notes).
  *
  *     This program is free software; you can redistribute it and/or modify
  *     it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 namespace sc_code {
 
 /* sclang keywords and builtins: rules 1 and 2 of the lexer (`sc_lexer.cpp`, copied
- * from SCODE.md §3.4). They are not "the class library": they are the language, so
+ * from the design notes). They are not "the class library": they are the language, so
  * they hold even with no engine and no index. */
 static const char *const kLanguageNames[] = {
 	"arg",              "classvar",            "const",      "super",     "this",

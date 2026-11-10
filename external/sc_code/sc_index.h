@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_index.h — class library index for `sc_code` (phase S6c, SCODE.md §10.1).
+/* sc_index.h — class library index for `sc_code` (phase S6c, the design notes).
  *
  * The editor cannot have the class library: the only truth lives in the engine
  * (6286 classes / 32347 methods in the user's installation, measured 02-nov). This
@@ -22,14 +22,14 @@
  *   - the LAST line is `#end`: the file can be half written when the editor looks
  *     at it, and without the marker nothing is accepted (all or nothing).
  *
- * Decisions (SCODE.md §10.1):
+ * Decisions:
  *   - If a class defines the same method name on the class side and on the instance
  *     side, the last line of the dump wins: they cannot be told apart (the
  *     `Cls.method(` in the text does not say which one it is).
  *   - `find()` walks the superclass chain (depth-capped, cycles are harmless);
  *     `find_direct()` does not, for whoever needs "does THIS class define it".
  *   - `symbol_names()` returns classes + unique method names, sorted: that is what
- *     feeds the completion session of the bar (§10.6).
+ *     feeds the completion session of the bar.
  *
  * Parsing is pure C++ and the file is read with `fopen`: no Max, no engine, so it
  * is pinned in `tests/index_test.cpp` like the buffer and the scroll.
@@ -83,7 +83,7 @@ class ClassIndex {
 	std::vector<std::string> symbol_names() const;
 
 	/* Classes only (`@super` records, class side excluded), sorted. Feeds the plain
-	 * completion session of the bar (S6c+, §10.6). */
+	 * completion session of the bar (S6c+). */
 	std::vector<std::string> class_names() const;
 
 	/* Method names of `owner` and of its superclass chain, sorted and unique. The class

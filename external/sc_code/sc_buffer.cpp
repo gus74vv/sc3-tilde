@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_buffer.cpp — text buffer of the `sc_code` editor (S1, SCODE.md §4/§7.4).
+/* sc_buffer.cpp — text buffer of the `sc_code` editor (S1, the design notes).
  *
  * Own code; see sc_buffer.h for the invariants and the license.
  *

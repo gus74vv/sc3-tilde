@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Makefile — external sc3~: .mxo bundle (Phase 2.3) + headless tests.
+# Makefile — external sc3~: .mxo bundle + headless tests.
 #
 #   make                                  # build/sc3~ (the bundle binary)
 #   make test                             # headless gate (engine_test)
@@ -25,7 +25,7 @@ WARN := -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type-mismatch
 CLDIR := build/cl
 BIN   := build/sc3~
 
-# --- libsndfile copied from SC.app (Phase 4 § 4.1) -----------------------------
+# --- libsndfile copied from SC.app -----------------------------
 # Generated here (not versioned): the .mxo and the headless tests share the SAME
 # copy with install_name @loader_path/../Frameworks/... (see sc.mk). The dylib in
 # SC.app is signed with a Developer ID; `install_name_tool` invalidates that
@@ -71,7 +71,7 @@ $(BIN): sc3_tilde.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h sc.mk $(SNDFILE)
 
 # --- headless gate (no Max) ---------------------------------------------------
 # By default it uses the class library of the real SC installation
-# (/Applications/SuperCollider.app) + the SCMaxCompat module from phase1.
+# (/Applications/SuperCollider.app) + the SCMaxCompat module from the first spike.
 engine_test: tests/engine_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFILE)
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) $(EXTRA_CXXFLAGS) \
@@ -83,7 +83,7 @@ evalcheck: tests/eval_check.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDF
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) \
 	    tests/eval_check.cpp Sc3Engine.cpp -o build/eval_check $(SC_LIBS)
 
-# Bug #29 (diagnostic, not part of the gate): evaluates a LIST of .scd files in the
+# (diagnostic, not part of the gate): evaluates a LIST of .scd files in the
 # embedded engine and says whether each one returned or left sclang stuck. The
 # engine's eval is not preemptible, so the only way to tell "still running" from
 # "looping forever" is a canary eval behind it (`info`'s busy= uses the same data).
@@ -103,7 +103,7 @@ compat:
 # 3.2: the gate runs twice — 48 kHz (s.options default) and 44.1 kHz (like a Max
 # project at 44.1) — to verify the World is born at the requested sr and that the
 # 440 Hz tone still measures 440 (tuning, not 404 from an 8.8% shift).
-# sc_code (Phase 6) joins the gate with its headless tests: lexer/regions are pure
+# sc_code joins the gate with its headless tests: lexer/regions are pure
 # C++ (no SC, no Max), so they run first. The engine tests use port 0 = AUTO (4.x),
 # so Max and the SuperCollider IDE no longer need to be closed.
 # 4.x: with 57110 taken (scsynth/IDE, no SO_REUSEADDR) the boot has to go to an
@@ -128,7 +128,7 @@ gate: test all sc_code_bundle
 sc_code_bundle:
 	$(MAKE) --no-print-directory -C sc_code bundle
 
-# sc_code S0: tokens and regions 1:1 with the SC IDE (port of SCODE.md §3.1/§3.4).
+# sc_code S0: tokens and regions 1:1 with the SC IDE (port of the design notes).
 sc_code_test:
 	$(MAKE) --no-print-directory -C sc_code test
 
@@ -153,7 +153,7 @@ fail_test: tests/fail_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFI
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) $(EXTRA_CXXFLAGS) \
 	    tests/fail_test.cpp Sc3Engine.cpp -o build/fail_test $(SC_LIBS) $(EXTRA_LDFLAGS)
 
-# 2.5: Phase 2 stress — N open/boot/audio/release cycles measuring fds, threads
+# 2.5: stress — N open/boot/audio/release cycles measuring fds, threads
 # and RSS. Alternates the World owner (renderBlock / pumpWhenIdle) and the sr.
 loop_test: tests/loop_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFILE)
 	@mkdir -p build
@@ -163,7 +163,7 @@ loop_test: tests/loop_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFI
 stress: loop_test
 	./build/loop_test $(STRESS_PORT)
 
-# Sanitizers (debt 4 of the handoff). ASan and TSan cannot be mixed in the same
+# Sanitizers (debt 4 of the design notes). ASan and TSan cannot be mixed in the same
 # binary, so each one gets its own dir:
 # build/san/<asan|tsan>/{engine_test,multi_test,loop_test}.
 # The SC libs are not instrumented (vendored) ⇒ ASan/TSan still see the heap and

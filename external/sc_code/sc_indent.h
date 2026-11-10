@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_indent.h — indentation level for a new line, PORT of the SC IDE.
  *
- * Procedencia (SCODE.md §3.10/§3.8):
+ * Procedencia:
  *   vendor/supercollider/editors/sc-ide/widgets/code_editor/sc_editor.cpp
  *     (tag Version-3.14.1): indentationLevel L709, indent L597,
  *     makeIndentationString L688, indentedStartOfLine L572.
@@ -45,7 +45,7 @@ int indent_level_at(const DocumentTokens &doc, int line, int col);
 
 /* Same, from the byte offset in the document (lexes internally).
  *
- * Includes the two exceptions of indent() (IDE L657-668, SCODE.md §7.7.6): if the
+ * Includes the two exceptions of indent() (IDE L657-668, the design notes): if the
  * caret ends up inside a multi-line comment or a string, the new line is NOT
  * indented (level 0): the IDE carries the "in_comment"/"in_string" of the
  * previous block. */
@@ -67,7 +67,7 @@ struct LineIndent {
 	bool apply;
 };
 
-/* Reindent of the cursor line (what typing a closer triggers, SCODE.md §7.7.5).
+/* Reindent of the cursor line (what typing a closer triggers, the design notes).
  * `apply == false` in the two cases where the IDE does NOT reindent (indent()
  * L657-668): - some part of the line is inside a multi-line comment
  * (TextBlockData::isInMultilineComment), or - the line is exactly the start of a
@@ -77,7 +77,7 @@ struct LineIndent {
 LineIndent indent_for_line_at_offset(const std::string &text, int offset);
 
 /* Indentation text: `level` × `indentWidth` spaces (the IDE with
- * `mSpaceIndent`, which is the default; we do not use tabs, §7.1). */
+ * `mSpaceIndent`, which is the default; we do not use tabs). */
 std::string indent_string(int level, int indentWidth);
 
 } // namespace sc_code

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_path.h — path formatting for the editor (SCODE.md §12: drops from the Finder;
- * §11: the `@snippets` path).
+/* sc_path.h — path formatting for the editor (the design notes: drops from the Finder;
+ * the `@snippets` path).
  *
  * Pure C++ (no Max, no AppKit) so the rules are pinned in `tests/path_test.cpp`.
  *

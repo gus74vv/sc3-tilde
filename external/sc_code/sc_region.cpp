@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_region.cpp — port of the region logic of the SC IDE editor.
  *
- * Procedencia (SCODE.md §3.1/§3.2/§3.8):
+ * Procedencia:
  *   vendor/supercollider/editors/sc-ide/widgets/code_editor/sc_editor.cpp
  *   (tag Version-3.14.1), funciones citadas en sc_region.h.
  * Copyright (c) 2012 Jakob Leben & Tim Blechmann — GPL v2 or later.

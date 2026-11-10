@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_call.h — "method call aid" for `sc_code` (S6c, SCODE.md §10.2): which call
+/* sc_call.h — "method call aid" for `sc_code` (S6c, the design notes): which call
  * contains the caret.
  *
  * The IDE solves this with `AutoCompleter::testMethodCall` (Qt + TokenIterator + the
@@ -31,7 +31,7 @@
  *   - With no call open, the caret inside or at either edge of `Class.method` gives
  *     the context of that name, with `arg` = -1 (no current argument).
  *   - `arg_start` is the beginning of the current argument (after the `(` or after the
- *     last level-0 comma): that is what tells the argument template of §10.7 whether the
+ *     last level-0 comma): that is what tells the argument template of whether the
  *     caret is at a CLEAN start or in the middle of a value.
  *
  *     This program is free software; you can redistribute it and/or modify
@@ -66,7 +66,7 @@ CallContext call_context_at(const std::string &text, int caret);
 
 /* True when the caret sits at a CLEAN start of the current argument: between
  * `cc.arg_start` and the caret there are only blanks. That is the condition of the
- * argument template (§10.7: Tab writes `name: `); in the middle of a value it is false
+ * argument template (Tab writes `name: `); in the middle of a value it is false
  * and Tab indents. */
 bool call_arg_clean_start(const std::string &text, const CallContext &cc, int caret);
 

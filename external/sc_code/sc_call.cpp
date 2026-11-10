@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_call.cpp — see sc_call.h (S6c, SCODE.md §10.2).
+/* sc_call.cpp — see sc_call.h (S6c, the design notes).
  *
  *     This program is free software; you can redistribute it and/or modify
  *     it under the terms of the GNU General Public License as published by
@@ -169,7 +169,7 @@ CallContext call_context_at(const std::string &text, int caret) {
 	if (p < 0) {
 		/* --- (2) no call: the caret is ON a name ---------------------------------
 		 * Clicking `Duty.kr` in the document has to show the same signature as typing
-		 * `Duty.kr(` (SCODE.md §10.2: the bar is also the help of what is already
+		 * `Duty.kr(` (the design notes: the bar is also the help of what is already
 		 * written). `arg` stays -1: there is no "current argument" without parentheses.
 		 * Inside a string/symbol/comment nothing is a name. */
 		if (state != StateCode)

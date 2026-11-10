@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_index.cpp — see sc_index.h (S6c, SCODE.md §10.1).
+/* sc_index.cpp — see sc_index.h (S6c, the design notes).
  *
  *     This program is free software; you can redistribute it and/or modify
  *     it under the terms of the GNU General Public License as published by

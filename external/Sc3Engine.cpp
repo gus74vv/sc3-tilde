@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Sc3Engine.cpp — the bootstrap verified in phase1, ported to a singleton with
+// Sc3Engine.cpp — the bootstrap verified in the first spike, ported to a singleton with
 // refcount, an sclang worker and per-block rendering. See Sc3Engine.h for the
-// threading model and phase1/test_world.cpp for why each step exists.
+// threading model and the world test for why each step exists.
 //
-// Boot order (do not re-investigate, see handoff.md):
+// Boot order (do not re-investigate, see the design notes):
 //   1. bindUDP(port)                      // before boot: no lost datagrams
 //   2. Resource dir = our own class library (stock + SCMaxCompat)
 //   3. sclang: boot() → compileLibrary (startup.scd + Quarks) or stock fallback
@@ -46,7 +46,7 @@
 #include "scsynthsend.h" // small_scpacket (the /status.reply we write ourselves)
 
 // World API outside the public headers: C++ (mangled) linkage, same as in
-// phase1/test_world.cpp. Do not declare inside extern "C".
+// the world test. Do not declare inside extern "C".
 void World_Run(struct World *inWorld);
 void World_Start(struct World *inWorld);
 void World_SetSampleRate(struct World *inWorld, double inSampleRate);
@@ -57,7 +57,7 @@ namespace {
 
 constexpr size_t kMaxTextBuffer = 256 * 1024;
 
-// Bug #29: ms since the first call (monotonic). Only deltas are used: it times the
+// ms since the first call (monotonic). Only deltas are used: it times the
 // eval in flight so `info`/the watchdog can tell "sclang is busy" from "idle"
 // (the job leaves the queue BEFORE it runs, so `queuedJobs()` alone lies).
 long long nowMs()
@@ -191,7 +191,7 @@ static bool versionMajorMinor(const std::string &v, int *maj, int *min)
 
 // Does this OSC packet carry `/clearSched` (top level or inside a bundle)?
 //
-// WHY THIS EXISTS (bug #22): the future timetags of the incoming bundles do NOT go
+// WHY THIS EXISTS: the future timetags of the incoming bundles do NOT go
 // to the World's scheduler, they go to `Impl::pending` (see schedule()). scsynth's
 // `ClearSchedCmd` — what `Server:freeAll` sends as part of `CmdPeriod.run` — empties
 // the World's scheduler, which for us is always empty, so the bundles we hold kept
@@ -379,7 +379,7 @@ void engineReplyFunc(struct ReplyAddress *addr, char *data, int size)
 	       reinterpret_cast<struct sockaddr *>(&ctx->peer), sizeof(ctx->peer));
 }
 
-// --- 3.6: OSC timetags (bug #11) -----------------------------------------
+// --- 3.6: OSC timetags -----------------------------------------
 // sclang anchors timetags to the host NTP clock (PyrSched.cpp:245,
 // syncOSCOffsetWithTimeOfDay) ⇒ comparing against system_clock is correct.
 inline int64_t oscNow()
@@ -424,13 +424,12 @@ struct Sc3Engine::Impl {
 	ReplyCtx reply;
 	bool verbose = false;
 
-	// 3.6 / bug #11: bundles with a future timetag. `NodeProxy:free` sends the
+	// 3.6: bundles with a future timetag. `NodeProxy:free` sends the
 	// group's `/n_free` at `fadeTime + server.latency`; running it immediately
 	// killed the proxy-control ramp (`Ndef(…).clear(10)` cut hard).
 	// No locks: they are touched by the same thread that owns the World (worker
 	// at boot, audio afterwards). The malloc of `data` happens only when a future
 	// bundle arrives (not audio-rate); if that ever hurts, move it to a fixed pool
-	// in Phase 4.
 	struct PendingPkt {
 		std::vector<char> data;
 		struct sockaddr_in from {};
@@ -452,13 +451,13 @@ struct Sc3Engine::Impl {
 	bool stop = false;
 	bool bootDone = false;
 	bool bootOk = false;
-	// Bug #29: start of the eval the worker is running. Written by the worker, read
+	// start of the eval the worker is running. Written by the worker, read
 	// by main (`info`, the watchdog) ⇒ atomics. `evalRunning` is the flag (0 ms after
 	// the first call to nowMs() is a legitimate start value, so the timestamp alone
 	// cannot mean "idle").
 	std::atomic<bool> evalRunning {false};
 	std::atomic<long long> evalStartMs {0};
-	// bug #23: owners, not a counter. `open(x)` / `release(x)` are idempotent per
+	// owners, not a counter. `open(x)` / `release(x)` are idempotent per
 	// owner, so the same `sc3~` cannot inflate the count (a plain ++/-- did: on the
 	// "failed boot → open again" path the count drifted, the last `close` did not
 	// tear the World down and the engine stayed Ready with nobody using it).
@@ -467,7 +466,7 @@ struct Sc3Engine::Impl {
 	std::atomic<bool> ready {false};
 	std::atomic<int> state {kBootIdle};
 	std::atomic<bool> cancel {false}; // release() during boot
-	// bug #13: `initRuntime` (VM pools, init_OSC, schedInit) happens ONCE per
+	// `initRuntime` (VM pools, init_OSC, schedInit) happens ONCE per
 	// process. Re-initializing it on a second open() crashes the VM (jump into
 	// freed memory inside the class library compile). The path SC supports is
 	// initRuntime once + compileLibrary/shutdownLibrary (what Cmd+K does in the
@@ -633,7 +632,7 @@ struct Sc3Engine::Impl {
 			size = (int)filtered.size();
 			isBundle = size >= 16 && std::memcmp(data, "#bundle\0", 8) == 0;
 		}
-		/* bug #22: `/clearSched` (Server:freeAll → CmdPeriod.run) has to drop the
+		/* `/clearSched` (Server:freeAll → CmdPeriod.run) has to drop the
 		   bundles waiting for a future timetag HERE, because they are not in the
 		   World's scheduler (see packetClearsSched). Order matters: clear first,
 		   then hand the packet to the World like any other. */
@@ -797,7 +796,7 @@ struct Sc3Engine::Impl {
 		}
 	}
 
-	// One block: drain + render + advance mBufCounter (bug 4 in handoff).
+	// One block: drain + render + advance mBufCounter.
 	// Used by the three possible owners of the World (boot, audio, pump with DSP
 	// off): a single path keeps "rendered" from drifting away from the World.
 	//
@@ -1001,7 +1000,7 @@ struct Sc3Engine::Impl {
 			}
 		} else if (!langBooted) {
 			st.scVersion = installedScVersion(app);
-			// 3.4: with an explicit classLibraryDir (fixture, Phase 4 bundle) it has
+			// 3.4: with an explicit classLibraryDir (fixture, bundle) it has
 			// to be validated here: otherwise sclang fails with "the library has not
 			// been compiled successfully" and it is not obvious that the path is the
 			// problem.
@@ -1036,7 +1035,7 @@ struct Sc3Engine::Impl {
 		//    inside).
 		if (!client) {
 			client = new Sc3LangClient("sc3-engine");
-			// bug #13: the VM survives close ⇒ it has to be shut down on process
+			// the VM survives close ⇒ it has to be shut down on process
 			// exit, and BEFORE SC's static destructors (if the process ends with the
 			// VM alive, `libc++abi: terminating` while destroying statics with SC
 			// threads still running).
@@ -1119,7 +1118,7 @@ struct Sc3Engine::Impl {
 		opt.mRealTime = false;
 		opt.mPreferredSampleRate = sr;
 		opt.mBufLength = (uint32)std::max<long>(so.blockSize, 1);
-		// Bus consistency (bug 7): mAudioBus is allocated with
+		// Bus consistency: mAudioBus is allocated with
 		// mBufLength * mNumAudioBusChannels; with fewer buses than in+out the UGens
 		// write past the allocation.
 		const long buses = std::max<long>(so.numAudioBusChannels,
@@ -1133,7 +1132,7 @@ struct Sc3Engine::Impl {
 		opt.mRealTimeMemorySize = (uint32)std::max<long>(so.memSize, 8192);
 		opt.mMaxWireBufs = (uint32)std::max<long>(so.numWireBufs, 64);
 		opt.mNumRGens = (uint32)std::max<long>(so.numRGens, 64);
-		// <= 32 or ServerOptions:maxLogins throws and `notified` is never set (bug 2).
+		// <= 32 or ServerOptions:maxLogins throws and `notified` is never set.
 		opt.mMaxLogins = (uint32)std::min<long>(std::max<long>(so.maxLogins, 1), 32);
 		opt.mVerbosity = verbose ? 1 : 0;
 
@@ -1168,7 +1167,7 @@ struct Sc3Engine::Impl {
 		World_Start(w);
 		lastAdvanceNs.store(nowNs());
 
-		// bug #14b: atexit handlers run in REVERSE registration order, and
+		// atexit handlers run in REVERSE registration order, and
 		// World_New dlopens the .scx => their static destructors get registered
 		// after the shutdownLang hook => on exit they would run before it, with a
 		// plugin's ~std::thread (e.g. UIUGens' uiListenThread) still joinable
@@ -1347,7 +1346,7 @@ struct Sc3Engine::Impl {
 				if (!job.setup.empty())
 					client->evaluate(job.setup, false);
 				client->evaluate(job.code, job.print);
-				evalRunning.store(false); // only after it RETURNED (bug #29)
+				evalRunning.store(false); // only after it RETURNED
 			}
 			if (client)
 				client->tick();
@@ -1355,7 +1354,7 @@ struct Sc3Engine::Impl {
 		}
 
 		// sclang (client) SURVIVES close: initRuntime happens once per process
-		// (bug #13) and the next open only recompiles the library. The Max
+		// and the next open only recompiles the library. The Max
 		// process ends with the VM alive, just like the IDE.
 		appendDrained();
 	}
@@ -1453,7 +1452,7 @@ void Sc3Engine::teardown()
 	// the lock held). We wait at most one block + the pump budget.
 	{
 		std::lock_guard<std::mutex> lk(s.worldMtx);
-		// BUG #13 — `unload_plugins` MUST be FALSE. `World_New` initializes the
+		// `unload_plugins` MUST be FALSE. `World_New` initializes the
 		// UGen library once per process (`static bool gLibInitted` in
 		// SC_World.cpp:315), so if the .scx are unloaded here
 		// (`deinitialize_library()` → `dlclose`), the next `World_New` does NOT
@@ -1924,7 +1923,7 @@ int Sc3Engine::pumpWhenIdle(int budgetMs)
 }
 
 // Shutdown of the sclang VM. Called from atexit (not from release: the VM lives
-// as long as the process, see bug #13).
+// as long as the process).
 void Sc3Engine::shutdownLang()
 {
 	Impl &s = *m;
@@ -1943,7 +1942,7 @@ void Sc3Engine::shutdownLang()
 	}
 	s.langBooted = false;
 
-	// BUG #14 — the .scx loaded by scsynth stay alive until here (on purpose:
+	// the .scx loaded by scsynth stay alive until here (on purpose:
 	// `World_Cleanup(…, false)`, otherwise the 2nd World uses unloaded UnitDefs,
 	// #13). But several plugins have threads of their own in statics (e.g.
 	// `UIUGens_supernova.scx` → `static std::thread uiListenThread`, which ships

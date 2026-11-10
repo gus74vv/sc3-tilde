@@ -3,7 +3,7 @@
  *
  * The Max SDK does **not** expose the clipboard (`jpatcher_api.h` only has
  * `jclipboard_datatypes()`), so it goes through `NSPasteboard` in ObjC++
- * (SCODE.md §3.6/§5). This header is pure C++: the implementation
+ * This header is pure C++: the implementation
  * (sc_clipboard.mm) is the only part of the editor that talks to AppKit.
  *
  *     This program is free software; you can redistribute it and/or modify

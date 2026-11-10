@@ -82,7 +82,7 @@ echo "   -> $BUNDLE"
 file "$BUNDLE/Contents/MacOS/sc3~"
 du -sh "$BUNDLE" | sed 's/^/   tamaño: /'
 
-# # --- Phase 4 § 4.1: the .mxo depends on nothing outside macOS + Max + itself
+# # --- the .mxo depends on nothing outside macOS + Max + itself
 # Acepta /usr/lib, /System/Library, @executable_path (frameworks de Max) y
 # @loader_path (nuestra libsndfile). Cualquier otra cosa = falla el build.
 check_deps() {

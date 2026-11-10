@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_code.cpp — S1: the Max object `sc_code` (in-patch code editor for `sc3~`).
  *
- * Living plan: SCODE.md (§5 keymap measured at K0, §8 phases). This file is UI +
+ * Living plan: the design notes (keymap measured at K0 phases). This file is UI +
  * glue: the text and the caret live in `sc_buffer` (headless, with its own test
  * table) and the decision of "what do I evaluate" lives in `sc_region`
  * (`sc_eval_span`, the IDE port). Here only:
@@ -15,14 +15,14 @@
  * outlet, with patchable messages, just like `[message]` but with no parser in
  * between.
  *
- * Phase track (SCODE.md §8): S1 = buffer + paint + typing + eval. S2 = selection
+ * Phase track: S1 = buffer + paint + typing + eval. S2 = selection
  * (mouse drag / double / triple click, ⇧-click), `⌘A/C/V/X` with NSPasteboard and
  * `⌘Z`/`⇧⌘Z`. S3 = auto-close of pairs, autoindent on Return and `⌃.` panic (see
  * 0.9.3). S4 = per-token highlight, with an incremental cache in `sc_highlight`.
  * S5 = scroll (brought forward), line-number gutter, attributes (colors, fontsize,
  * readonly, autoclose, tabwidth, linenumbers), `jsave`/`jload` and `@file` with
- * autoload/autowrite (§7.10); bracket matching + title bar (§7.11) and the context
- * menu with Save/Load to File (§7.13).
+ * autoload/autowrite; bracket matching + title bar and the context
+ * menu with Save/Load to File.
  *
  * This program is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
@@ -31,9 +31,9 @@
 
 #include "ext.h"
 #include "ext_obex.h"
-#include "ext_drag.h" /* jdrag_*: drops, including Finder files (SCODE.md §12) */
+#include "ext_drag.h" /* jdrag_*: drops, including Finder files */
 #include "jpatcher_api.h"
-#include "jpatcher_syms.h" /* jpatcher_syms_init(): WITHOUT this jbox_new() segfaults (bug #17) */
+#include "jpatcher_syms.h" /* jpatcher_syms_init(): WITHOUT this jbox_new() segfaults */
 #include "jgraphics.h"
 
 #include <chrono>
@@ -81,7 +81,7 @@
  * RESERVED at the bottom of the box (`h - bar_height`, so the caret can never hide
  * behind it) and it shows the signature of the call that contains the caret
  * (`SinOsc.ar(` ⇒ `SinOsc.ar(freq, phase, mul, add)`, current argument highlighted,
- * `2/4` on the right). The data comes from the class library index (§10.1) read by
+ * `2/4` on the right). The data comes from the class library index read by
  * `mtime`: `stat` on every paint, the 1,16 MB dump re-read only when it changed.
  * `@barcolor`/`@barhighlight` are the colors; with `@callaid 0` nothing changes for the
  * text. It is display-only: no key is intercepted and the buffer is never touched.
@@ -194,7 +194,7 @@ typedef struct _sc_code {
 	t_symbol *snipfile;         /* @snippets: path of the snippets file */
 	ScSnipState *snips;         /* dict parseado + stamp del hot-reload */
 
-	/* --- S6c: index of the class library ('index', SCODE.md §10.1) -------- */
+	/* --- S6c: index of the class library ('index', the design notes) -------- */
 	t_symbol *indexfile;        /* @indexfile: the file sclang writes the dump to */
 	sc_code::ClassIndex *index; /* the parsed dump (heap: std::map members) */
 	std::string index_loaded;   /* path the current dict came from ("" = none) */
@@ -202,13 +202,13 @@ typedef struct _sc_code {
 	long long index_size;
 	long index_warned;          /* the "never generated" notice goes once per object */
 
-	/* --- S6c step 2b: the bottom bar (§10.2) ------------------------------ */
+	/* --- S6c step 2b: the bottom bar ------------------------------ */
 	long callaid;               /* 1 = reserved bar with the signature (default 1) */	double bar_h;               /* bar height in px (0 = no bar, from sc_code_bar_height) */
 	long bar_grab;              /* 1 = the mousedown was on the bar: ignore the drag */
 	t_jrgba barcolor;           /* bar background */
 	t_jrgba barhighlight;       /* color of the current argument */
 
-	/* --- S6c+: completion session (⌃Space, §10.6) ------------------------ */
+	/* --- S6c+: completion session (⌃Space) ------------------------ */
 	sc_code::Completer *completer; /* candidate engine (headless, sc_complete) */
 	std::string compl_receiver; /* receiver the candidate list came from (cache key) */
 	long compl_open;            /* 1 = the bar is showing candidates, not the signature */
@@ -607,11 +607,11 @@ static void sc_code_snippets_msg(t_sc_code *x, t_symbol *s, long argc, t_atom *a
 }
 
 /**********************************************************************/
-/* S6c: index of the class library ('index' message, SCODE.md §10.1)    */
+/* S6c: index of the class library ('index' message, the design notes) */
 /* sc_code never talks to the engine, so the answer travels through a file: this
  * message only EMITS the generator through the 'eval' outlet (it is one expression
  * => one 'eval') and sclang writes the dump. The bar picks the file up later
- * (§10.2), so nothing here waits for it.
+ * so nothing here waits for it.
  * Nothing is generated on its own: emitting code the user did not write is exactly
  * what was ruled out. 'index <path>' overrides @indexfile for one shot. */
 
@@ -645,7 +645,7 @@ static void sc_code_index_msg(t_sc_code *x, t_symbol *s, long argc, t_atom *argv
  * asynchronously and nothing in `sc_code` waits for it). The stamp is `stat`ed on every
  * paint — two syscalls, cheaper than a timer and it can never leave the bar stale —
  * and the 1,16 MB file is parsed ONLY when mtime/size changed (once per regeneration,
- * §10.1). `@callaid 0` costs nothing: no stat, no bar. */
+ * `@callaid 0` costs nothing: no stat, no bar. */
 static void sc_code_index_refresh(t_sc_code *x) {
 	if (!x->callaid || !x->index)
 		return;
@@ -807,7 +807,7 @@ static void sc_code_scrollspeed_msg(t_sc_code *x, double v) {
 /**********************************************************************/
 /* drops from the Finder                                               */
 
-/* Drag & drop of files from the Finder. Measured, not guessed (SCODE.md §12):
+/* Drag & drop of files from the Finder. Measured, not guessed:
  * `ext_drag.h` says it only covers the Max file browser, but the drag of a Finder
  * file is delivered through the same `jdrag` object, so the road is the one
  * `buffer~` and `sfplay~` use — `acceptsdrag_locked` / `acceptsdrag_unlocked` — plus
@@ -916,7 +916,7 @@ static void sc_code_getdrawparams(t_sc_code *x, t_object *patcherview, t_jboxdra
 C74_EXPORT void ext_main(void *r) {
 	t_class *c;
 
-	/* SDK prerequisite for UI objects (bug #17): it fills the static t_symbol*
+	/* SDK prerequisite for UI objects: it fills the static t_symbol*
 	 * tables that jbox_new() uses. Requires compiling jpatcher_syms.c into the
 	 * bundle (see Makefile). */
 	jpatcher_syms_init();
@@ -980,7 +980,7 @@ C74_EXPORT void ext_main(void *r) {
 	/* Same name as a direct message through the inlet (see sc_code_snippets_msg). */
 	class_addmethod(c, (method)sc_code_snippets_msg, "snippets", A_GIMME, 0);
 
-	/* S6c: where sclang writes the class library index (§10.1). By default it is ONE file
+	/* S6c: where sclang writes the class library index. By default it is ONE file
 	 * per installation (…/Max 9/Library/sc_code-index.txt, derived from the bundle path);
 	 * this attribute only OVERRIDES it, and it is saved with the patch. */
 	CLASS_ATTR_SYM(c, "indexfile", 0, t_sc_code, indexfile);
@@ -989,7 +989,7 @@ C74_EXPORT void ext_main(void *r) {
 	class_addmethod(c, (method)sc_code_index_msg, "index", A_GIMME, 0);
 
 	/* S6c step 2b: the bottom bar with the signature of the call under the caret
-	 * (§10.2). `@callaid 1` (default) RESERVES one line at the bottom, so the caret can
+	 * `@callaid 1` (default) RESERVES one line at the bottom, so the caret can
 	 * never end up behind it; `0` gives the whole box back to the text. Display only:
 	 * no key is intercepted and the buffer is never written. */
 	CLASS_ATTR_LONG(c, "callaid", 0, t_sc_code, callaid);
@@ -1080,7 +1080,7 @@ C74_EXPORT void ext_main(void *r) {
 	CLASS_ATTR_DEFAULT_SAVE(c, "scrollspeed", 0, "3.");
 	class_addmethod(c, (method)sc_code_scrollspeed_msg, "scrollspeed", A_FLOAT, 0);
 
-	/* --- 0.9.5: files dropped from the Finder (SCODE.md §12) ---------------- */
+	/* --- 0.9.5: files dropped from the Finder ---------------- */
 	class_addmethod(c, (method)sc_code_acceptsdrag, "acceptsdrag_locked", A_CANT, 0);
 	class_addmethod(c, (method)sc_code_acceptsdrag, "acceptsdrag_unlocked", A_CANT, 0);
 	class_addmethod(c, (method)sc_code_dropfile, "dropfile", A_CANT, 0);
@@ -1163,7 +1163,7 @@ static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv) {
 	x->blink_state.stop();
 	x->blink_state.set_duration((double)x->blinkduration);
 	/* Auto-close of pairs on: the user asked for it and it is what every code
-	 * editor does (the IDE has it as a setting, default off, §3.11). It is now the
+	 * editor does (the IDE has it as a setting, default off). It is now the
 	 * `autoclose` attribute. */
 	x->buf->set_auto_close(x->autoclose != 0);
 	x->focused = 0;
@@ -1347,7 +1347,7 @@ static int sc_code_row_of_offset(t_sc_code *x, int offset) {
 }
 
 /* Color of a token according to the attribute palette (S5b). IDE groupings
- * (§7.9.5); whatever is not listed falls back to the normal text color. */
+ * whatever is not listed falls back to the normal text color. */
 static const t_jrgba *sc_code_token_color(t_sc_code *x, int type) {
 	switch ((sc_code::TokenType)type) {
 	case sc_code::Keyword:
@@ -1461,7 +1461,7 @@ static void sc_code_paint_range(t_sc_code *x, t_jgraphics *g, const sc_code::Scr
 	}
 }
 
-/* --- S6c+: the completion session (⌃Space, SCODE.md §10.6) --------------- */
+/* --- S6c+: the completion session (⌃Space, the design notes) --------------- */
 
 /* Receiver the caret is typing after: `SinOsc.` -> `SinOsc`, anything else "". Same
  * narrow rule as `sc_call`: only an identifier starting with an uppercase letter can be
@@ -1493,7 +1493,7 @@ static void sc_code_compl_close(t_sc_code *x) {
 }
 
 /* Asks the engine for the candidate at `cycle` and keeps the session in sync. Returns
- * false when there is nothing to offer, and then the session CLOSES itself (§10.6: "si
+ * false when there is nothing to offer, and then the session CLOSES itself ("si
  * queda vacía se cierra sola"). The candidate source only changes with the receiver:
  * `set_external` rebuilds the pool, so it is not done on every keystroke.
  *
@@ -1543,7 +1543,7 @@ static bool sc_code_compl_refresh(t_sc_code *x, int cycle, int min_prefix) {
 /* Explicit request (⌃Space): open (or close) the session at the caret with no minimum
  * prefix, so right after `SinOsc.` the list is complete. Kept as the manual door even
  * though the automatic path does not need it (02-nov: on this keyboard neither ⌃Space
- * nor ⌥Space reaches `key`, see SCODE.md §10.6). */
+ * nor ⌥Space reaches `key`, see the design notes). */
 static void sc_code_compl_toggle(t_sc_code *x) {
 	if (x->compl_open) {
 		sc_code_compl_close(x);
@@ -1596,7 +1596,7 @@ static void sc_code_compl_accept(t_sc_code *x) {
 	jbox_redraw(&x->j_box);
 }
 
-/* S6c / §10.7 — the argument TEMPLATE of the IDE. Inside `SinOsc.ar(` Tab writes the name
+/* S6c — the argument TEMPLATE of the IDE. Inside `SinOsc.ar(` Tab writes the name
  * of the current argument (`freq: `) and leaves the caret ready for the value; after the
  * comma, Tab writes the next one (`phase: `), and so on. It only fires at a CLEAN start
  * (nothing but spaces between the `(` or the last comma and the caret) and when the index
@@ -1674,7 +1674,7 @@ static void sc_code_paint_bar(t_sc_code *x, t_jgraphics *g, const t_rect &rect) 
 	jgraphics_rectangle(g, 0., top, rect.width, 1.);
 	jgraphics_fill(g);
 
-	/* §10.6 — two modes, ONE bar. Precedence: an open session shows candidates; closing
+	/* two modes, ONE bar. Precedence: an open session shows candidates; closing
 	 * it (Esc, ⏎, a click, or the filter running out) brings the signature back. */
 	const double bar_right = rect.width - (BAR_W + 2.);
 	const double text_x = sc_code_text_x(x);
@@ -1702,7 +1702,7 @@ static void sc_code_paint_bar(t_sc_code *x, t_jgraphics *g, const t_rect &rect) 
 
 	sc_code::BarModel model;
 	if (!sc_code_bar_model(x, &model))
-		return; /* context left / unknown method: the strip stays blank (§10.2) */
+		return; /* context left / unknown method: the strip stays blank */
 
 	const sc_code::BarCells c = sc_code::bar_layout(model, cells);
 	if (c.text.empty())
@@ -1837,7 +1837,7 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	const int last = x->scroll.last_line(m);
 
 	/* selection, BELOW the text (S2). The columns are VISUAL (code points): an accent
-	 * on the line no longer shifts the selection or the caret (handoff bug #2). */
+	 * on the line no longer shifts the selection or the caret. */
 	sc_code_paint_range(x, g, m, x->selcolor, buf.selection_start(), buf.selection_end(), first, last);
 
 	/* S5e — evaluation blink: the SAME range that was sent to sclang, with the alpha
@@ -2011,7 +2011,7 @@ static void sc_code_getdrawparams(t_sc_code *x, t_object *patcherview, t_jboxdra
 
 #define K_RETURN (-4)
 #define K_TAB (-5)
-#define K_ESC (-3) /* JKEY_ESC: Max does not grab it (§3.9) */
+#define K_ESC (-3) /* JKEY_ESC: Max does not grab it */
 #define K_PERIOD 46 /* '.' (⇧. gives 62 ⇒ panic compares keycode, not textcharacter) */
 #define K_DELETE (-6)
 #define K_BACKSPACE (-7)
@@ -2030,7 +2030,7 @@ static bool sc_is_printable(long tc) {
 }
 
 /* --- ⌘ shortcuts (S2): they arrive with textcharacter = 0 and keycode = ASCII
- * (§3.9) - */
+ * */
 
 static void sc_code_copy(t_sc_code *x) {
 	if (!x->buf->has_selection())
@@ -2106,7 +2106,7 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		return 1;
 	}
 
-	/* S6c+ — ⌃Space opens/closes the completion session (§10.6). macOS may own ⌃Space
+	/* S6c+ — ⌃Space opens/closes the completion session. macOS may own ⌃Space
 	 * ("Select next source in input menu") when there is more than one input layout, so
 	 * ⌥Space is accepted as the fallback decided in the plan. The space keycode is matched
 	 * on both sides (32 and 49) on purpose: it is the one measurement of the keymap that
@@ -2138,12 +2138,12 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 	}
 
 	switch (keycode) {
-	/* --- evaluation (SCODE.md §1/§3.2) ------------------------------------ */
+	/* --- evaluation ------------------------------------ */
 	case K_RETURN:
 		/* S6c+ decision (02-nov): ⏎ is NEVER taken by the session — it keeps evaluating and
 		 * inserting newlines. Only Tab writes the suggestion. */
 		if (cmd && shift) {
-			sc_code_eval_with_mode(x, sc_code::EvalModeDocument); /* agregado nuestro (§7.1) */
+			sc_code_eval_with_mode(x, sc_code::EvalModeDocument); /* agregado nuestro */
 			return 1;
 		}
 		if (cmd) {
@@ -2262,10 +2262,10 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		buf.move_line_end(shift);
 		break;
 
-	/* --- Tab = spaces (§7.1 decision), or cycling inside a session (S6c+) --- */
+	/* --- Tab = spaces (decision), or cycling inside a session (S6c+) --- */
 	case K_TAB:
 		/* S6c+: with a candidate in the bar, Tab INSERTS it (one undo step) and ⇧Tab
-		 * cycles. Without a candidate, Tab is still indentation (spaces, §7.1). */
+		 * cycles. Without a candidate, Tab is still indentation (spaces). */
 		if (x->compl_open) {
 			if (shift)
 				sc_code_compl_cycle_by(x, -1);
@@ -2280,7 +2280,7 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 			buf.outdent((int)x->tabwidth);
 			break;
 		}
-		/* §10.7: at a clean start of an argument of a known call, Tab writes `name: `
+		/* at a clean start of an argument of a known call, Tab writes `name: `
 		 * (IDE behavior) instead of a hard tab. `break`, so the tail updates the highlight
 		 * and the autowrite exactly like any other edit. */
 		if (sc_code_arg_label(x))
@@ -2299,13 +2299,13 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 
 	default:
 		/* Printable: only without ⌘/⌃ (those carry textcharacter 0 and are shortcuts,
-		 * §3.9). */
+		 * */
 		if (cmd || ctrl)
 			return 0; /* ⌘A/C/V/X/Z y ⌘E/⌘S los maneja Max o S2 */
 		if (x->readonly)
 			return 1;
 		if (!sc_is_printable(textcharacter))
-			return 0; /* IME/dead key: do not consume (documented limit, §2) */
+			return 0; /* IME/dead key: do not consume (documented limit) */
 		buf.insert_char((unsigned int)textcharacter);
 		/* The IDE reindents the line when a closer is typed (insertMatchingTokens L400:
 		 * `if (isClosingToken) indent(cursor, ...)`): the line of the `)` `]` `}` goes
@@ -2575,7 +2575,7 @@ static void sc_code_mouseenter(t_sc_code *x, t_object *patcherview, t_pt pt, lon
 static long sc_code_mousedown(t_sc_code *x, t_object *patcherview, t_pt pt, long modifiers) {
 	sc_code::Buffer &buf = *x->buf;
 
-	/* S6c+: a click ends the completion session (§10.6: it is a mode the user opened
+	/* S6c+: a click ends the completion session (it is a mode the user opened
 	 * explicitly and it does not survive the caret moving). */
 	if (x->compl_open)
 		sc_code_compl_close(x);

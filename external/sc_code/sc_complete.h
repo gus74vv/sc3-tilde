@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_complete.h — candidate engine for the completion session of `sc_code` (S6c+,
- * SCODE.md §10.6): `text + caret -> one candidate`, with no Max and no paint.
+ * the design notes): `text + caret -> one candidate`, with no Max and no paint.
  *
  * There is no popup (the IDE uses a QListView over sclang introspection): the bar is
  * ONE line, so the alternatives are navigated by cycling and what is shown is always
@@ -15,7 +15,7 @@
  *   3. `~envVars` (only if the token starts with `~`) and `\symbols` (only with `\`),
  *      also from the document;
  *   4. `set_external()`: names that come from OUTSIDE (S6c+: the classes and method
- *      names of the class library index, §10.1). That is the only contact point: the
+ *      names of the class library index). That is the only contact point: the
  *      module does not know where they came from.
  *
  * Invariants (pinned in `tests/complete_test.cpp`):
@@ -70,7 +70,7 @@ class Completer {
 
 	/* Names that come from outside (S6c+: classes + methods of the sclang index).
 	 * They are added to the document ones; the ranking treats them as frequency 0.
-	 * `exclusive` = use ONLY these (the `Class.` case of §10.6: after a dot the
+	 * `exclusive` = use ONLY these (the `Class.` case of: after a dot the
 	 * candidates are the methods of the receiver, and the words of the document are
 	 * noise there). */
 	void set_external(std::vector<std::string> names, bool exclusive = false);

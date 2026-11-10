@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_lexer.h — sclang lexer for `sc_code`, PORT of the SuperCollider IDE.
  *
- * Provenance (SCODE.md §3.4/§3.8):
+ * Provenance:
  *   vendor/supercollider/editors/sc-ide/core/sc_lexer.hpp  (tag Version-3.14.1)
  *   vendor/supercollider/editors/sc-ide/core/sc_lexer.cpp  (367 lines)
  *   vendor/supercollider/editors/sc-ide/widgets/code_editor/tokens.hpp

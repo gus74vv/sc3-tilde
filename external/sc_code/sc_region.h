@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_region.h — evaluation region and "what do I evaluate?" for `sc_code`.
  *
- * Provenance (SCODE.md §3.1/§3.2/§3.8):
+ * Provenance:
  *   vendor/supercollider/editors/sc-ide/widgets/code_editor/sc_editor.cpp
  *     (tag Version-3.14.1): previousOpeningBracket L971, nextClosingBracket L991,
  *     matchBracket L1014, nextBracketPair L1033, tokenMaybeRegionStart L1084,
@@ -81,7 +81,7 @@ bool bracket_pair_defines_region(const DocumentTokens &doc, const BracketPair &p
 Region region_around_cursor(const DocumentTokens &doc, int caretPos);
 Region current_region(const DocumentTokens &doc, int caret);
 
-/* --- what each shortcut evaluates (SCODE.md §3.2) -------------------------- */
+/* --- what each shortcut evaluates -------------------------- */
 
 enum EvalKind {
 	EvalNothing = 0, /* evaluate nothing (empty line, ⇧Return with no text, …) */
@@ -110,7 +110,7 @@ enum EvalMode {
 	EvalModeDocument = 2 /* ⌘⇧Return: document (without looking at selection or caret) */
 };
 
-/* §3.2 precedence, ported from evaluateLine/evaluateRegion/evaluateDocument.
+/* precedence, ported from evaluateLine/evaluateRegion/evaluateDocument.
  * `caret`, `selStart`, `selEnd` are byte offsets; pass selStart == selEnd (or -1)
  * for "no selection". A negative `caret` means "use selEnd". */
 EvalSpan sc_eval_span(const std::string &text, int caret, int selStart, int selEnd,

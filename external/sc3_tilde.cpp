@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc3~ — Max external: SuperCollider 3.14.1 embedded (sclang + scsynth in-process).
  *
- * Phase 2.3: `open` brings up the engine (`Sc3Engine`: sclang + World) and
- * `perform64` pulls the audio out of the World. Phase 3.5: multiple instances
+ * `open` brings up the engine (`Sc3Engine`: sclang + World) and
+ * `perform64` pulls the audio out of the World. multiple instances
  * **by buses** — several `sc3~` share ONE World and each one reads its range of
  * buses (the World advances by absolute sample position, see `Sc3Engine::pull`).
  *
  * Layout (see help/sc3~.maxhelp):
  *   1 message inlet (right) + `@ins N` signal inlets to its left (0..16,
  *   default 0 = as in v0.12). Inlet i goes to the World's INPUT bus i ⇒
- *   `SoundIn.ar(i)` / `In.ar(NumOutputBuses + i, …)` read it (Phase 3.8).
+ *   `SoundIn.ar(i)` / `In.ar(NumOutputBuses + i, …)` read it.
  *   Only one `sc3~` per patch can be the input producer.
  *   ARGS: `[sc3~]` = 2 channels from bus 0 (compat) · `[sc3~ n]` = n channels
  *         from bus 0 · `[sc3~ n bus]` = n channels from bus `bus`.
@@ -33,7 +33,7 @@
  * the engine); only the Qt-less module ships inside the bundle
  * (`Contents/Resources/SCMaxCompat`).
  *
- * Project rules (see AGENTS.md): the sclang VM is never touched from the audio
+ * Project rules (see the design notes): the sclang VM is never touched from the audio
  * thread; the World is only touched from `perform64` (and from the worker
  * during boot, see Sc3Engine.h).
  */
@@ -81,7 +81,7 @@ typedef struct _sc3 {
 	void *pump_clock;    /* 3.3: advances the World with DSP off (main thread) */
 	int pump_running;    /* pump_clock is scheduled (avoids duplicate ticks) */
 	int pending_stop;    /* 0 = none, 1 = panic, 2 = hardstop, 3 = freeall */
-	/* bug #26: this instance is an OWNER of the process-wide World (opened, or
+	/* this instance is an OWNER of the process-wide World (opened, or
 	   auto-attached by eval/panic). The audio thread reads it (`sc3_perform64`): an
 	   instance that never attached and one that was `close`d must stay silent, so
 	   `info` (engine=off) and the outlets cannot disagree. Atomic because of that
@@ -101,7 +101,7 @@ typedef struct _sc3 {
 	   is only touched by the audio thread. 5 ms linear ramp. */
 	std::atomic<float> gain_target;
 	float gain;
-	/* Bug #29: the "eval is not returning" error was already posted for the eval in
+	/* the "eval is not returning" error was already posted for the eval in
 	   flight (cleared when sclang goes back to idle). */
 	int stuck_warned;
 } t_sc3;
@@ -122,7 +122,7 @@ static int gDebugEval = 0;
    Patches that connect [print post]/[print error] send `console 0`, so each
    line comes out ONCE (otherwise it shows up twice: console + print).
 
-   BUG #20: this used to be ONE global. Opening a second patch that sends
+    this used to be ONE global. Opening a second patch that sends
    `console 0` — the `sc3~` help, the test patches, any patch wiring `[print]` —
    silently muted the console for EVERY instance, so the patch that was already
    running just "stopped posting" (and nothing said why). The Max console is one
@@ -236,11 +236,11 @@ static void sc3_post(t_sc3 *x, const char *fmt, ...)
 /* The object's OWN voice (open / close / panic / hardstop / freeall): always to
    Max's console and to the `post` outlet.
 
-   `sc3_post` mirrors only with `console 1` (bug #20: a patch that wires
+    `sc3_post` mirrors only with `console 1`: a patch that wires
    [print post] turns the mirror off so each engine line comes out once). For the
    lifecycle that rule is wrong: with the flag off, a `close` + `open` made the
    object look dead — the engine booted (or failed) and NOTHING said so anywhere
-   (bug #23). So the lifecycle skips the flag. Cost: in a patch with `console 0`
+    So the lifecycle skips the flag. Cost: in a patch with `console 0`
    AND [print post] wired, these few lines show up twice (once from here, once
    from [print]); engine text keeps its "once" contract. */
 static void sc3_note(t_sc3 *x, const char *fmt, ...)
@@ -415,7 +415,7 @@ static void sc3_report_status(t_sc3 *x)
 	         SC3_TILDE_VERSION, stateName, st.sampleRate, st.bufLength,
 	         x->maxvec, st.numUnits, st.degraded ? "yes" : "no",
 	         st.scVersion.empty() ? "?" : st.scVersion.c_str());
-	/* Bug #29: `queued` does not include the eval IN FLIGHT (the worker pops it
+	/* `queued` does not include the eval IN FLIGHT (the worker pops it
 	   before running) ⇒ `busy` is the one that answers "is sclang answering?". */
 	char busy[48];
 	if (st.busyMs == 0)
@@ -480,7 +480,7 @@ static void sc3_report_status(t_sc3 *x)
 
 /* ------------------------------------------------------------------ mensajes */
 
-/* bug #26: attach THIS object to a World that is already up. It is `open` without a
+/* attach THIS object to a World that is already up. It is `open` without a
    boot — the World/sclang are process-wide, so there is nothing to start — but the
    owner registration is what keeps `info`, `close` (only this instance stops
    listening) and the refcount honest: without it the object rendered and evaluated
@@ -505,9 +505,9 @@ static bool sc3_attach_existing(t_sc3 *x, const char *why)
    cache of it. When they disagree — a boot cancelled by another instance's
    `close`, a patch that was closed from elsewhere, a World that failed after the
    boot — an `eval` used to be queued forever with NOTHING said, which is exactly
-   what "the object stopped answering" looks like (bug #23). Syncing the flag here
+    what "the object stopped answering" looks like. Syncing the flag here
    is also what makes the next `open` boot again instead of answering "already
-   open". bug #26: with the World already up the sync goes the other way — the
+    open". with the World already up the sync goes the other way — the
    object ATTACHES instead of failing (sc3~ never booted twice). */
 static bool sc3_require_engine(t_sc3 *x, const char *what)
 {
@@ -527,8 +527,8 @@ static bool sc3_require_engine(t_sc3 *x, const char *what)
 	return false;
 }
 
-/* Bug #29: sclang has no preemption, so an eval that loops (e.g. a Number
-   `nextTimeOnGrid` with an Array as clock — see handoff #29) never returns. Any
+/* sclang has no preemption, so an eval that loops (e.g. a Number
+    `nextTimeOnGrid` with an Array as clock — see the design notes) never returns. Any
    `eval` queued behind it would never run, so it is dropped with a visible error
    instead of piling up in silence (this is what looked like "sc3~ stopped
    answering"). Panic/close are NOT dropped: their SC side is queued too, and the
@@ -560,7 +560,7 @@ static void sc3_open(t_sc3 *x)
 		sc3_note(x, "open: already open (idempotent)");
 		return;
 	}
-	/* bug #26: the World is shared, so with it already up `open` means ATTACH, not
+	/* the World is shared, so with it already up `open` means ATTACH, not
 	   boot. Nothing is restarted and the instance is usable immediately. */
 	if (engine.isReady() || engine.isBooting()) {
 		if (!sc3_attach_existing(x, "open")) {
@@ -597,7 +597,7 @@ static void sc3_close(t_sc3 *x)
 		sc3_note(x, "close: was not open");
 		return;
 	}
-	/* Bug #29: with sclang stuck inside an eval, teardown would join a thread that
+	/* with sclang stuck inside an eval, teardown would join a thread that
 	   never returns ⇒ Max frozen on `close`. Same rule as `eval`: say it and drop
 	   it (the engine is unrecoverable; restart Max). */
 	if (Sc3Engine::instance().evalStuck()) {
@@ -652,7 +652,7 @@ static t_max_err sc3_console_set(t_sc3 *x, t_object *attr, long argc, t_atom *ar
 /* `console 0` / `console 1`: whether THIS instance's engine text is mirrored to
    the Max console in addition to going out the outlets. 0 when the patch already
    wires [print post]/[print error]. It never touches the other patches: they
-   keep their own flag (bug #20, see gConsoleInstances). */
+    keep their own flag (see gConsoleInstances). */
 static void sc3_console(t_sc3 *x, long on)
 {
 	sc3_set_console(x, on != 0);
@@ -707,7 +707,7 @@ static void sc3_send(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
 /* 3.5: instance context for the user's code, as a separate "setup"
    (evalWithSetup): the user code is compiled VERBATIM, as in the SC IDE. It used
    to be concatenated in front of the text and that broke any block starting with
-   `var` (bug #19): the chunk no longer started with `(`, so `sclang` parsed the
+    `var`: the chunk no longer started with `(`, so `sclang` parsed the
    `var` in the middle of an expression ⇒
    "syntax error, unexpected VAR, expecting ')'".
    The two interprets are atomic with respect to each other (same worker job), so
@@ -717,7 +717,7 @@ static void sc3_send(t_sc3 *x, t_symbol *s, long argc, t_atom *argv)
    Note: it is sclang's topEnvironment, so it holds for the synchronous eval (what
    gets deferred to a Routine/clock sees the last evaluated value; there it is
    better to pass the bus explicitly).
-   Bug #31: the setup writes to `topEnvironment` explicitly instead of `~sc3out = …`.
+    the setup writes to `topEnvironment` explicitly instead of `~sc3out = …`.
    The `~x = v` sugar assigns into `currentEnvironment`, which SURVIVES between
    evals: after `ProxySpace.push(s.boot)` in one eval, the setup of the NEXT one
    landed inside that space, where LazyEnvir turns a missing key into a NodeProxy
@@ -857,7 +857,7 @@ static void sc3_evalfile(t_sc3 *x, t_symbol *s)
    jump is audible again (measured: click even with the fade). */
 static void sc3_request_stop(t_sc3 *x, int kind)
 {
-	/* bug #26: same rule as eval — if the World is up, attach; if not, this is a
+	/* same rule as eval — if the World is up, attach; if not, this is a
 	   real "nothing to stop", not a silent refusal. */
 	if (!sc3_require_engine(x, "panic/hardstop/freeall"))
 		return;
@@ -913,7 +913,7 @@ static void sc3_assist(t_sc3 *x, void *b, long m, long a, char *s)
 	}
 }
 
-/* Phase 2 of the stop: the ramp already finished (gain 0) ⇒ now SC and clear the
+/* stop: the ramp already finished (gain 0) ⇒ now SC and clear the
    ring. No fade-in here: the next user `eval` brings gain back up. */
 static void sc3_finish_stop(t_sc3 *x)
 {
@@ -1016,7 +1016,7 @@ static void sc3_flush(t_sc3 *x)
 			}
 		}
 
-		/* Bug #29: watchdog for an eval that never returns. The VM cannot be
+		/* watchdog for an eval that never returns. The VM cannot be
 		   interrupted (the embedded client has no SIGINT/hook), so the least we owe
 		   the user is to SAY it — once per eval — instead of looking dead while sclang
 		   burns memory. */
@@ -1048,7 +1048,7 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 {
 	(void)dsp64; (void)flags; (void)userparam;
 
-	/* bug #26: `eng.isReady()` is about the SHARED World, not about this object.
+	/* `eng.isReady()` is about the SHARED World, not about this object.
 	   An instance that never attached (no `open`/eval/panic) or that was `close`d
 	   must not listen: it reads buses that another instance's code may be writing,
 	   so without this the object played while `info` said engine=off. Silence here
@@ -1064,7 +1064,7 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 	   samples that just came in through the inlets; the decoupling between the host
 	   block and the World block is absorbed by the engine ring (prefill). */
 	if (x->ins > 0 && x->input_claimed) {
-		/* bug #18 (measured): Max hands `ins[]` over with the LAST signal inlet in
+		/* (measured): Max hands `ins[]` over with the LAST signal inlet in
 		   `ins[0]` — the `dsp_setup` proxies are created right to left.
 		   It is reversed so that "bus ch = inlet ch+2" (inlet 2 = SoundIn.ar(0)). */
 		double *rev[16];
@@ -1190,7 +1190,7 @@ static void sc3_dsp64(t_sc3 *x, t_object *dsp64, short *count, double samplerate
 
 	/* 3.5: the cursor starts at the "now" of the stream (a new instance must not
 	   read old samples or request a jump backwards) and gain goes back to 0:
-	   re-entering DSP, the 8 ms ramp fades in from silence (bug #12: the last
+	    re-entering DSP, the 8 ms ramp fades in from silence: the last
 	   frames of the previous cycle used to be heard at full amplitude). Own
 	   buffers are no longer needed: the engine splits the window into chunks when
 	   `sampleframes` exceeds its history. */
@@ -1363,7 +1363,7 @@ static void *sc3_new(t_symbol *s, long argc, t_atom *argv)
 	/* 3.8: `ins_created` = value from the scan; the attribute applies the same (below). */
 	const long ins_created = x->ins;
 
-	/* 3.8 / bug #18 — MANDATORY ORDER (measured in Max 9.2, 30-oct):
+	/* 3.8 — MANDATORY ORDER (measured in Max 9.2, 30-oct):
 	   1. the MESSAGE inlet is created FIRST (it ends up as inlet 1);
 	   2. `dsp_setup` creates the `ins` signal inlets to its right AFTERWARDS.
 
@@ -1375,7 +1375,7 @@ static void *sc3_new(t_symbol *s, long argc, t_atom *argv)
 	   above `z_in = 0`, `count[] = [1 1 …]` and every inlet reaches its channel.
 	   Measured: ctrlin~ (control, no extra inlet) z_in=0 ✓; the 4 variants with the
 	   extra inlet afterwards gave z_in=1 and broken mapping (inlet_new, intin,
-	   proxy_new, forced z_in — Max rewrites it). See PLAN.md "bug #18".
+	    proxy_new, forced z_in — Max rewrites it). See the design notes .
 	   With `ins == 0` only the message inlet is left (v0.12 behavior). */
 	if (x->ins > 0)
 		inlet_new((t_object *)x, NULL);
@@ -1461,7 +1461,7 @@ static void sc3_free(t_sc3 *x)
 		Sc3Engine::instance().release(x);
 		x->opened = false;
 	}
-	if (x->console_on) { /* bug #20: the counter must not drift when a patch closes */
+	if (x->console_on) { /* the counter must not drift when a patch closes */
 		gConsoleInstances--;
 		x->console_on = 0;
 	}
@@ -1510,7 +1510,7 @@ extern "C" void C74_EXPORT ext_main(void *r)
 	   every line comes out ONCE. Default 1 (like the SC IDE's post window). It is
 	   the same state as the `console 0|1` message — but the attribute is SAVED
 	   with the patch, so no loadbang is needed. Per instance: it never mutes
-	   another patch (bug #20). */
+	    another patch. */
 	class_addattr(c, attr_offset_new("console", USESYM(long), 0, (method)0L,
 	                                 (method)sc3_console_set,
 	                                 calcoffset(t_sc3, console_on)));

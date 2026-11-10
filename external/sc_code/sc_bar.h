@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_bar.h — the bottom bar of `sc_code` (S6c, SCODE.md §10.2): geometry and text
+/* sc_bar.h — the bottom bar of `sc_code` (S6c, the design notes): geometry and text
  * layout, with no Max and no jgraphics, so the risky part is a test table.
  *
  * What it draws (one reserved line, always present while `@callaid` is on):
@@ -12,7 +12,7 @@
  *     truncated with "…" when it does not fit, and the current argument has priority
  *     over the head of the signature (that is the whole point of the aid, so it must
  *     stay on screen even in a narrow box).
- *   - The bar is ONE line: candidates are navigated by cycling (§10.6), never by a
+ *   - The bar is ONE line: candidates are navigated by cycling, never by a
  *     multi-line popup.
  *   - Cells: the signature is ASCII (class, method and argument names), so one byte
  *     is one monospace cell; the only multi-byte character is the "…" this module
@@ -68,7 +68,7 @@ struct BarCells {
 /* Lays `m` out in `cells` monospace columns (cells <= 0 = unbounded). */
 BarCells bar_layout(const BarModel &m, int cells);
 
-/* Height of the bar for a font with this line height (SCODE.md §10.2: line_h + 4). */
+/* Height of the bar for a font with this line height (the design notes: line_h + 4). */
 int bar_height(double line_h);
 
 /* Height left for the text viewport: the bar is RESERVED, not intermittent (making it

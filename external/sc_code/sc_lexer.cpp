@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_lexer.cpp — Qt-free port of `ScLexer` + the SC IDE `highlightBlock`.
  *
- * Provenance (SCODE.md §3.4/§3.8):
+ * Provenance:
  *   vendor/supercollider/editors/sc-ide/core/sc_lexer.cpp  (tag Version-3.14.1)
  *   vendor/supercollider/editors/sc-ide/widgets/code_editor/highlighter.cpp
  * Copyright (c) 2012 Jakob Leben & Tim Blechmann — GPL v2 or later.

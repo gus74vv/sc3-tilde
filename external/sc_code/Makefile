@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Makefile — external `sc_code` (in-patch code editor for `sc3~`).
 #
-# Phases (SCODE.md §8):
+# Phases:
 #   K0  make spike / make install-spike   → keylog.mxo (key spike, NOT distributed)
 #   S0  make test                         → lexer_test + region_test (headless, no Max)
 #   S1  make test                         → + buffer_test (UTF-8 buffer/caret/undo)
@@ -84,7 +84,7 @@ $(B)/index_test: tests/index_test.cpp sc_index.cpp sc_index.h
 	@mkdir -p $(B)
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/index_test.cpp sc_index.cpp -o $@
 
-# S6c §10.5: write a REAL dump with sclang and check the parser on it (~32k entries).
+# S6c: write a REAL dump with sclang and check the parser on it (~32k entries).
 # sclang does not exit after running a file (it stays as a REPL), so the dump is
 # polled for its #end marker and the process is killed: the file is the gate.
 SCLANG ?= /Applications/SuperCollider.app/Contents/MacOS/sclang
@@ -100,7 +100,7 @@ index-real: $(B)/index_test
 	@grep "sc_code index" $(B)/index_gen.log || echo "index: sclang wrote nothing (see $(B)/index_gen.log)"
 	./$(B)/index_test -v "$(INDEX)"
 
-# S7 (0.9.5): drop-path formatting — pure strings, no Max (SCODE.md §12).
+# S7 (0.9.5): drop-path formatting — pure strings, no Max.
 $(B)/path_test: tests/path_test.cpp sc_path.cpp sc_path.h
 	@mkdir -p $(B)
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/path_test.cpp sc_path.cpp -o $@
@@ -241,7 +241,7 @@ KEYLOG_VER := 0.1.0
 # jpatcher_syms.c: the SDK requires it for UI objects. jbox_new() uses dozens of
 # static t_symbol* (ps_rect, ps_juiobject, …) filled in by jpatcher_syms_init();
 # the .c has to be COMPILED INTO the bundle (Max does not export them) and called
-# from ext_main. Without it: SIGSEGV inside jbox_new when creating the box (bug #17).
+# from ext_main. Without it: SIGSEGV inside jbox_new when creating the box.
 JPATCHER_SYMS := $(MAXINC)/common/jpatcher_syms.c
 CC := cc
 

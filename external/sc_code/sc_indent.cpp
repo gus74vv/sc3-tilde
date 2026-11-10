@@ -24,7 +24,7 @@
  * gives the SAME tokens: WhiteSpace, comments and string contents are not stored,
  * so the parentheses inside them do not count (same as in the IDE). - The two
  * special cases of `indent()` (L657-668) for strings and multi-line comments ARE
- * ported (SCODE.md §7.7.6): the IDE does not reindent a block if some part of it
+ * ported: the IDE does not reindent a block if some part of it
  * was lexed inside a comment (`isInMultilineComment`) or if the block is exactly
  * the start of one; and if the block STARTS inside a string it indents it at
  * level 0. For the NEW Return line the same idea holds looking at the state AT

@@ -34,7 +34,7 @@
 //    again: `LazyEnvir:at` creates a NodeProxy and `NodeProxy.asControlInput`
 //    (BusPlug.sc:92) answers with its OWN `busArg`, so `Out.ar(~sc3out, sig)`
 //    compiles, runs and writes to a bus nobody monitors — silence, no error (the
-//    same trap as bug #31, user side); `~sc3out` in there even creates the proxy
+//    same trap as user side); `~sc3out` in there even creates the proxy
 //    as a side effect. Use `~out.play`, `topEnvironment.at(\sc3out)`, or capture
 //    the bus before the `push`. Fixed neither here nor by overriding
 //    `LazyEnvir:at`, which was rejected: it would reserve the two keys inside

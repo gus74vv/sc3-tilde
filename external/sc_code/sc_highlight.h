@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* sc_highlight.h — incremental PER-LINE token cache to paint `sc_code`.
  *
- * SCODE.md §3.5: in the IDE the highlighter and the regions SHARE the tokens of
+ * the design notes: in the IDE the highlighter and the regions SHARE the tokens of
  * each block (TextBlockData, with stateIn/stateOut). Here the same is done but
  * headless: `Highlight` stores, per line, the complete token stream (including
  * spaces and comments, which the IDE does not store because it paints them "on the
@@ -9,7 +9,7 @@
  *
  * - paint colors without lexing again (only what changed), - the object knows
  * whether a line starts inside a multi-line comment or a string (the two special
- * cases of the IDE indentation, §7.7.6).
+ * cases of the IDE indentation).
  *
  * Provenance of the COLOR (the splitting is already in sc_lexer):
  * vendor/supercollider/editors/sc-ide/widgets/code_editor/highlighter.cpp (tag

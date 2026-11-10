@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/* sc_wrap.h — wrap visual del editor `sc_code` (fase S5e, SCODE.md §7.17).
+/* sc_wrap.h — wrap visual del editor `sc_code` (fase S5e, the design notes).
  *
  * Problem: the editor had no horizontal scroll, so a line wider than the box could
  * only be read by enlarging the box. Now the text is SPLIT into VISUAL ROWS at the
