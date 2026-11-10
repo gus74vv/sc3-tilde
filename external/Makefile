@@ -52,7 +52,7 @@ $(SANLINK): $(SNDFILE)
 	@mkdir -p $(dir $@)
 	ln -sf ../../../Frameworks/$(SNDFILE_NAME) $@
 
-.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test input_test loop_test fail_test evalcheck compat clean bundle sndfile
+.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test input_test loop_test fail_test evalcheck compat clean bundle sndfile
 
 all: $(BIN)
 
@@ -111,10 +111,11 @@ compat:
 coexist: engine_test
 	python3 tests/coexist_check.py ./build/engine_test
 
-test: sc_code_test engine_test multi_test input_test fail_test
+test: sc_code_test engine_test multi_test reopen_test input_test fail_test
 	./build/engine_test
 	SC3_SR=44100 ./build/engine_test
 	./build/multi_test
+	./build/reopen_test
 	./build/input_test
 	./build/fail_test
 
@@ -138,6 +139,14 @@ multi_test: tests/multi_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SND
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) $(EXTRA_CXXFLAGS) \
 	    tests/multi_test.cpp Sc3Engine.cpp -o build/multi_test $(SC_LIBS) $(EXTRA_LDFLAGS)
+
+# close → open: the shared stream restarts but the instance cursor is stale. It has
+# to snap to the new stream instead of rendering a 128-block catch-up burst on every
+# host block (the CPU spike in Max's meter that `dsp off/on` used to cut).
+reopen_test: tests/reopen_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFILE)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) $(EXTRA_CXXFLAGS) \
+	    tests/reopen_test.cpp Sc3Engine.cpp -o build/reopen_test $(SC_LIBS) $(EXTRA_LDFLAGS)
 
 # 3.8: audio input — SoundIn.ar(i) reads what is pushed into inlet i
 # (exact mapping, 2-block prefill, single producer, underrun ⇒ silence).

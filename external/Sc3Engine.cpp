@@ -1695,6 +1695,18 @@ bool Sc3Engine::pull(Sc3AudioCursor &c, long bus, int nchan, double **outs, long
 		return false;
 	if (!s.ready.load())
 		return false;
+	/* close → open recreates the World and the shared stream restarts at 0, but this
+	   instance's cursor still holds the position of the OLD stream: it is only reset
+	   in dsp64, which a close/open with DSP on never calls. A cursor AHEAD of
+	   `rendered` is exactly that case, and it used to make every host block render the
+	   128-block catch-up cap for minutes (the CPU spike that `dsp off/on` cut, because
+	   dsp64 does call resetCursor). Inside one stream `pos <= rendered` always holds
+	   (`pos == rendered` in steady state), so snapping to the present is free. */
+	{
+		const uint64_t now = s.rendered.load(std::memory_order_acquire);
+		if (c.pos > now)
+			c.pos = now;
+	}
 	// A window larger than the history is split into contiguous chunks (Max can
 	// ask for signal vectors of up to 8192; the history is >= 4096).
 	long done = 0;
