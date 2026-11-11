@@ -58,6 +58,7 @@
 #include "sc_indent.h"
 #include "sc_path.h"
 #include "sc_region.h"
+#include "sc_theme.h"
 #include "sc_scroll.h"
 #include "sc_snip.h"
 #include "sc_wrap.h"
@@ -111,15 +112,20 @@
  * <symbol>` (no temporary .scd). 0.7.1: `jsave` keys with a prefix (the box
  * dictionary already has `text`). 0.7.0 (S5c): bracket pair at the caret + title
  * bar. Carries over 0.6.1 (height resize), 0.6.0 (gutter, attributes, jsave/jload,
- * @file) and everything before. */
-#define SC_CODE_VERSION "0.9.11"
+ * @file) and everything before. 0.9.12: highlight of the CURRENT LINE (@curlinecolor,
+ * the row the caret is on, tinted behind the text and the gutter; alpha 0 turns it
+ * off). 0.9.13: `@theme <name>` with 7 presets — One Dark is the
+ * factory palette and the menu of the Inspector is built from the table — plus the
+ * individual colors still working as overrides. */
+#define SC_CODE_VERSION "0.9.13"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
- * exposed remain (the scroll bar) plus the fixed geometry. */
-#define COL_BAR_R 0.62
-#define COL_BAR_G 0.66
-#define COL_BAR_B 0.74
+ * exposed remain (the scroll bar) plus the fixed geometry. The defaults are
+ * Catppuccin Mocha: the scroll bar uses overlay0 (#6c7086). */
+#define COL_BAR_R 0.424
+#define COL_BAR_G 0.439
+#define COL_BAR_B 0.525
 
 #define PAD_X 6.
 #define PAD_Y 4.
@@ -164,6 +170,8 @@ typedef struct _sc_code {
 
 	/* --- S5b: attributes ------------------------------------------------- */
 	t_jrgba bgcolor, textcolor, selcolor, caretcolor; /* base */
+	t_jrgba curlinecolor;       /* background of the caret line (0.9.12) */
+	t_symbol *theme;            /* @theme: canonical name of the preset in use (0.9.13) */
 	t_jrgba keywordcolor, builtincolor, primitivecolor, classcolor; /* tokens */
 	t_jrgba symbolcolor, stringcolor, charcolor, numbercolor;
 	t_jrgba envvarcolor, commentcolor, bracketcolor, operatorcolor;
@@ -805,6 +813,122 @@ static void sc_code_scrollspeed_msg(t_sc_code *x, double v) {
 }
 
 /**********************************************************************/
+/* 0.9.13 — `@theme`: named palettes */
+/*
+ * The palette is 21 RGBA attributes. `@theme <name>` copies a whole preset
+ * (sc_theme.cpp) over them in ONE step; an individual color keeps working as an
+ * OVERRIDE. The precedence is decided by asking the dictionary the object was created
+ * with: a color that is THERE was written by hand (in the box or by a saved patch) and
+ * survives the preset; the ones that are not take the preset's value. It has to be the
+ * dictionary and not the order of the setters, because Max does not guarantee the order
+ * in which it applies the attributes of a dictionary (same trap as `file`/`autoload`,
+ * see sc_code_new).
+ */
+
+static t_jrgba sc_to_jrgba(const sc_code::RGBA &c) {
+	t_jrgba v;
+	v.red = c.r;
+	v.green = c.g;
+	v.blue = c.b;
+	v.alpha = c.a;
+	return v;
+}
+
+/* Copies the preset over the attributes. `keep` = dictionary to respect (NULL = apply
+ * everything: it is a message or the inspector asking for the palette). */
+static void sc_code_apply_theme(t_sc_code *x, const sc_code::Theme *t, t_dictionary *keep) {
+	if (!t)
+		return;
+	auto overridden = [keep](const char *name) { return keep && dictionary_hasentry(keep, gensym((char *)name)); };
+	if (!overridden("bgcolor"))
+		x->bgcolor = sc_to_jrgba(t->bg);
+	if (!overridden("textcolor"))
+		x->textcolor = sc_to_jrgba(t->text);
+	if (!overridden("selcolor"))
+		x->selcolor = sc_to_jrgba(t->sel);
+	if (!overridden("caretcolor"))
+		x->caretcolor = sc_to_jrgba(t->caret);
+	if (!overridden("curlinecolor"))
+		x->curlinecolor = sc_to_jrgba(t->curline);
+	if (!overridden("keywordcolor"))
+		x->keywordcolor = sc_to_jrgba(t->keyword);
+	if (!overridden("builtincolor"))
+		x->builtincolor = sc_to_jrgba(t->builtin);
+	if (!overridden("primitivecolor"))
+		x->primitivecolor = sc_to_jrgba(t->primitive);
+	if (!overridden("classcolor"))
+		x->classcolor = sc_to_jrgba(t->klass);
+	if (!overridden("symbolcolor"))
+		x->symbolcolor = sc_to_jrgba(t->symbol);
+	if (!overridden("stringcolor"))
+		x->stringcolor = sc_to_jrgba(t->string);
+	if (!overridden("charcolor"))
+		x->charcolor = sc_to_jrgba(t->charlit);
+	if (!overridden("numbercolor"))
+		x->numbercolor = sc_to_jrgba(t->number);
+	if (!overridden("envvarcolor"))
+		x->envvarcolor = sc_to_jrgba(t->envvar);
+	if (!overridden("commentcolor"))
+		x->commentcolor = sc_to_jrgba(t->comment);
+	if (!overridden("bracketcolor"))
+		x->bracketcolor = sc_to_jrgba(t->bracket);
+	if (!overridden("operatorcolor"))
+		x->operatorcolor = sc_to_jrgba(t->op);
+	if (!overridden("matchcolor"))
+		x->matchcolor = sc_to_jrgba(t->match);
+	if (!overridden("blinkcolor"))
+		x->blinkcolor = sc_to_jrgba(t->blink);
+	if (!overridden("barcolor"))
+		x->barcolor = sc_to_jrgba(t->bar);
+	if (!overridden("barhighlight"))
+		x->barhighlight = sc_to_jrgba(t->barhighlight);
+	x->theme = gensym((char *)t->name); /* the canonical name, not what the user typed */
+	if (!keep)
+		jbox_redraw((t_jbox *)x); /* at creation Max paints anyway (that is why `keep`) */
+}
+
+/* The names, for the two messages that report a problem / the list. */
+static void sc_code_theme_names(std::string *out) {
+	for (int i = 0; i < sc_code::theme_count(); ++i) {
+		if (i)
+			out->append(" ");
+		out->append(sc_code::theme_at(i)->name);
+	}
+}
+
+/* `@theme <name>` (attribute, inspector or args). It only validates and applies: an
+ * unknown name is reported and nothing changes. */
+static t_max_err sc_code_set_theme(t_sc_code *x, t_object *attr, long argc, t_atom *argv) {
+	if (!argc || !argv)
+		return MAX_ERR_NONE;
+	const char *name = atom_getsym(argv)->s_name;
+	const sc_code::Theme *t = sc_code::theme_find(name);
+	if (!t) {
+		std::string list;
+		sc_code_theme_names(&list);
+		object_error((t_object *)x, "theme: there is no \"%s\" (available: %s)", name, list.c_str());
+		return MAX_ERR_NONE;
+	}
+	sc_code_apply_theme(x, t, NULL);
+	return MAX_ERR_NONE;
+}
+
+/* Same path as a message through the inlet (`theme dracula`): the attribute alone does
+ * not create the message (see `scrollspeed`). */
+static void sc_code_theme_msg(t_sc_code *x, t_symbol *s) {
+	t_atom a[1];
+	atom_setsym(a, s);
+	sc_code_set_theme(x, NULL, 1, a);
+}
+
+/* `themes`: the list of presets and which one is in use (discovery, no help patch). */
+static void sc_code_themes_msg(t_sc_code *x) {
+	std::string list;
+	sc_code_theme_names(&list);
+	object_post((t_object *)x, "themes: %s (in use: %s)", list.c_str(), x->theme ? x->theme->s_name : "?");
+}
+
+/**********************************************************************/
 /* drops from the Finder                                               */
 
 /* Drag & drop of files from the Finder. Measured, not guessed:
@@ -921,6 +1045,11 @@ C74_EXPORT void ext_main(void *r) {
 	 * bundle (see Makefile). */
 	jpatcher_syms_init();
 
+	/* 0.9.13: the menu of `@theme` comes from the table (adding a theme there is the
+	 * only thing needed for it to show up in the Inspector). */
+	std::string theme_menu;
+	sc_code_theme_names(&theme_menu);
+
 	c = class_new("sc_code", (method)sc_code_new, (method)sc_code_free, sizeof(t_sc_code), (method)NULL,
 				  A_GIMME, 0L);
 
@@ -996,66 +1125,87 @@ C74_EXPORT void ext_main(void *r) {
 	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "callaid", 0, "1");
 
 	CLASS_ATTR_RGBA(c, "barcolor", 0, t_sc_code, barcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "barcolor", 0, "0.125 0.135 0.160 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "barcolor", 0, SC_THEME_ONEDARK_BAR);
 
 	CLASS_ATTR_RGBA(c, "barhighlight", 0, t_sc_code, barhighlight);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "barhighlight", 0, "1.0 0.55 0.15 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "barhighlight", 0, SC_THEME_ONEDARK_BARHIGHLIGHT);
 
-	/* --- S5b: colors (RGBA, saved with the patch) --------------------------- */
+	/* --- 0.9.12: the line of the caret ------------------------------ */
+	CLASS_ATTR_RGBA(c, "curlinecolor", 0, t_sc_code, curlinecolor);
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "curlinecolor", 0, SC_THEME_ONEDARK_CURLINE);
+
+	/* --- 0.9.13: `@theme <name>` — the palette in one step -----------
+	 * The menu of the Inspector is BUILT from the table of sc_theme.cpp (`enum`), so
+	 * adding a theme there makes it appear here: there is no second list to keep. The
+	 * list is advisory — the setter still accepts any name or alias the table knows. */
+	CLASS_ATTR_SYM(c, "theme", 0, t_sc_code, theme);
+	CLASS_ATTR_ACCESSORS(c, "theme", NULL, (method)sc_code_set_theme);
+	CLASS_ATTR_DEFAULT_SAVE(c, "theme", 0, "onedark");
+	CLASS_ATTR_ENUM(c, "theme", 0, theme_menu.c_str());
+	/* Same name as a message through the inlet (`theme dracula`) + the list of names. */
+	class_addmethod(c, (method)sc_code_theme_msg, "theme", A_SYM, 0);
+	class_addmethod(c, (method)sc_code_themes_msg, "themes", 0);
+
+	/* --- S5b: colors (RGBA, saved with the patch) ---------------------------
+	 * Factory palette: One Dark (0.9.13). The numbers are NOT here: they are the macros
+	 * of sc_theme.h, which are the same strings the `onedark` row of sc_theme.cpp
+	 * parses, so "no @theme" and "@theme onedark" cannot drift apart. A color
+	 * set by hand is an OVERRIDE: it wins over a preset applied at creation.
+	 * The grouping of the roles is */
 	CLASS_ATTR_RGBA(c, "bgcolor", 0, t_sc_code, bgcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "bgcolor", 0, "0.105 0.110 0.130 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "bgcolor", 0, SC_THEME_ONEDARK_BG);
 
 	CLASS_ATTR_RGBA(c, "textcolor", 0, t_sc_code, textcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "textcolor", 0, "0.900 0.910 0.930 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "textcolor", 0, SC_THEME_ONEDARK_TEXT);
 
 	CLASS_ATTR_RGBA(c, "selcolor", 0, t_sc_code, selcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "selcolor", 0, "0.280 0.420 0.720 0.40");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "selcolor", 0, SC_THEME_ONEDARK_SEL);
 
 	CLASS_ATTR_RGBA(c, "caretcolor", 0, t_sc_code, caretcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "caretcolor", 0, "1.0 0.55 0.15 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "caretcolor", 0, SC_THEME_ONEDARK_CARET);
 
 	CLASS_ATTR_RGBA(c, "keywordcolor", 0, t_sc_code, keywordcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "keywordcolor", 0, "0.80 0.62 0.95 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "keywordcolor", 0, SC_THEME_ONEDARK_KEYWORD);
 
 	CLASS_ATTR_RGBA(c, "builtincolor", 0, t_sc_code, builtincolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "builtincolor", 0, "0.55 0.85 0.85 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "builtincolor", 0, SC_THEME_ONEDARK_BUILTIN);
 
 	CLASS_ATTR_RGBA(c, "primitivecolor", 0, t_sc_code, primitivecolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "primitivecolor", 0, "0.90 0.60 0.90 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "primitivecolor", 0, SC_THEME_ONEDARK_PRIMITIVE);
 
 	CLASS_ATTR_RGBA(c, "classcolor", 0, t_sc_code, classcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "classcolor", 0, "0.55 0.78 0.95 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "classcolor", 0, SC_THEME_ONEDARK_CLASS);
 
 	CLASS_ATTR_RGBA(c, "symbolcolor", 0, t_sc_code, symbolcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "symbolcolor", 0, "0.95 0.72 0.42 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "symbolcolor", 0, SC_THEME_ONEDARK_SYMBOL);
 
 	CLASS_ATTR_RGBA(c, "stringcolor", 0, t_sc_code, stringcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "stringcolor", 0, "0.65 0.85 0.55 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "stringcolor", 0, SC_THEME_ONEDARK_STRING);
 
 	CLASS_ATTR_RGBA(c, "charcolor", 0, t_sc_code, charcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "charcolor", 0, "0.85 0.86 0.50 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "charcolor", 0, SC_THEME_ONEDARK_CHAR);
 
 	CLASS_ATTR_RGBA(c, "numbercolor", 0, t_sc_code, numbercolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "numbercolor", 0, "0.62 0.75 1.0 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "numbercolor", 0, SC_THEME_ONEDARK_NUMBER);
 
 	CLASS_ATTR_RGBA(c, "envvarcolor", 0, t_sc_code, envvarcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "envvarcolor", 0, "0.95 0.60 0.45 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "envvarcolor", 0, SC_THEME_ONEDARK_ENVVAR);
 
 	CLASS_ATTR_RGBA(c, "commentcolor", 0, t_sc_code, commentcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "commentcolor", 0, "0.48 0.56 0.50 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "commentcolor", 0, SC_THEME_ONEDARK_COMMENT);
 
 	CLASS_ATTR_RGBA(c, "bracketcolor", 0, t_sc_code, bracketcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "bracketcolor", 0, "0.78 0.80 0.86 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "bracketcolor", 0, SC_THEME_ONEDARK_BRACKET);
 
 	CLASS_ATTR_RGBA(c, "operatorcolor", 0, t_sc_code, operatorcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "operatorcolor", 0, "0.85 0.85 0.92 1.");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "operatorcolor", 0, SC_THEME_ONEDARK_OPERATOR);
 
 	/* --- S5c: title bar and bracket matching ------------------------------- */
 	CLASS_ATTR_LONG(c, "titlebar", 0, t_sc_code, titlebar);
 	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "titlebar", 0, "1");
 
 	CLASS_ATTR_RGBA(c, "matchcolor", 0, t_sc_code, matchcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "matchcolor", 0, "0.35 0.48 0.70 0.45");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "matchcolor", 0, SC_THEME_ONEDARK_MATCH);
 
 	CLASS_ATTR_LONG(c, "matchbrackets", 0, t_sc_code, matchbrackets);
 	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "matchbrackets", 0, "1");
@@ -1072,7 +1222,7 @@ C74_EXPORT void ext_main(void *r) {
 	CLASS_ATTR_DEFAULT_SAVE(c, "blinkduration", 0, "500");
 
 	CLASS_ATTR_RGBA(c, "blinkcolor", 0, t_sc_code, blinkcolor);
-	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "blinkcolor", 0, "1.0 0.55 0.15 0.40");
+	CLASS_ATTR_DEFAULT_SAVE_PAINT(c, "blinkcolor", 0, SC_THEME_ONEDARK_BLINK);
 
 	/* --- 0.9.1: wheel / trackpad speed ------------------------------------- */
 	CLASS_ATTR_DOUBLE(c, "scrollspeed", 0, t_sc_code, scrollspeed);
@@ -1180,8 +1330,14 @@ static t_sc_code *sc_code_new(t_symbol *s, long argc, t_atom *argv) {
 	x->sb_drag = 0;
 	x->sb_grab = 0.;
 	x->scrollspeed = 3.;
+	x->theme = NULL; /* 0.9.13: the preset (@theme); NULL = the factory one */
 
 	attr_dictionary_process((t_object *)x, d); /* box attributes (rect, …) */
+	/* 0.9.13: the palette, AFTER the attributes: a color written by hand in the box (or
+	 * restored from a saved patch) is an override and the preset only fills in what the
+	 * dictionary does not mention. When `@theme` came in the dictionary its
+	 * setter already applied the palette; doing it again here is idempotent. */
+	sc_code_apply_theme(x, sc_code::theme_find(x->theme ? x->theme->s_name : "onedark"), d);
 	/* Text stored by `jsave`: it wins over `@file` (it is the exact state the patch
 	 * was saved with). If there is no stored text it returns an error and touches
 	 * nothing. */
@@ -1819,6 +1975,22 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	t_rect thumb;
 	const bool has_bar = sc_code_thumb_rect(x, m, &bar, &thumb);
 
+	/* 0.9.12 — CURRENT LINE: the row the caret is on gets a background band.
+	 * It is the VISUAL row (`sc_code_row_of_offset`), so with wrap only the piece of the
+	 * line under the caret is tinted. It is painted BEFORE the clip on purpose: the band
+	 * covers the gutter too and the numbers (drawn later) stay legible on top of it. The
+	 * alpha is the attribute's: 0 turns it off. It goes under the selection, the blink,
+	 * the bracket pair and the text. */
+	if (x->curlinecolor.alpha > 0.) {
+		const int caret_row = sc_code_row_of_offset(x, x->buf->caret());
+		if (caret_row >= x->scroll.first_line(m) && caret_row <= x->scroll.last_line(m)) {
+			jgraphics_rectangle(g, 0., x->title_h + x->scroll.line_screen_y(caret_row, m), rect.width, x->line_h);
+			jgraphics_set_source_rgba(g, x->curlinecolor.red, x->curlinecolor.green, x->curlinecolor.blue,
+									  x->curlinecolor.alpha);
+			jgraphics_fill(g);
+		}
+	}
+
 	/* The text is clipped from the gutter up to just before the bar: a long line
 	 * cannot cover the line numbers or the bar. The width is the SAME one the wrap
 	 * uses (`sc_code_cols_for_width`), so what is seen is exactly what was split. */
@@ -2143,7 +2315,7 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		/* S6c+ decision (02-nov): ⏎ is NEVER taken by the session — it keeps evaluating and
 		 * inserting newlines. Only Tab writes the suggestion. */
 		if (cmd && shift) {
-			sc_code_eval_with_mode(x, sc_code::EvalModeDocument); /* agregado nuestro */
+			sc_code_eval_with_mode(x, sc_code::EvalModeDocument); /* our addition (design notes) */
 			return 1;
 		}
 		if (cmd) {

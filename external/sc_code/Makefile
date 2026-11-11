@@ -24,9 +24,10 @@ B := build
 
 CORE_SRC := sc_lexer.cpp sc_region.cpp sc_buffer.cpp sc_indent.cpp sc_scroll.cpp sc_highlight.cpp \
             sc_bracket.cpp sc_wrap.cpp sc_blink.cpp sc_snip.cpp sc_path.cpp sc_index.cpp \
-            sc_call.cpp sc_bar.cpp sc_complete.cpp
+            sc_call.cpp sc_bar.cpp sc_complete.cpp sc_theme.cpp
 CORE_HDR := sc_lexer.h sc_region.h sc_buffer.h sc_indent.h sc_scroll.h sc_highlight.h sc_bracket.h \
-            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h sc_call.h sc_bar.h sc_complete.h
+            sc_wrap.h sc_blink.h sc_snip.h sc_path.h sc_index.h sc_call.h sc_bar.h sc_complete.h \
+            sc_theme.h
 # Pure C++ for the tests; the clipboard (ObjC++) only goes into the bundle.
 UI_SRC := sc_code.cpp sc_clipboard.mm sc_filedialog.mm
 UI_HDR := sc_code.cpp sc_clipboard.h sc_filedialog.h
@@ -47,7 +48,8 @@ $(B)/region_test: tests/region_test.cpp $(CORE_SRC) $(CORE_HDR)
 
 test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/scroll_test \
       $(B)/highlight_test $(B)/bracket_test $(B)/wrap_test $(B)/blink_test $(B)/snip_test \
-      $(B)/path_test $(B)/index_test $(B)/call_test $(B)/bar_test $(B)/complete_test
+      $(B)/path_test $(B)/index_test $(B)/call_test $(B)/bar_test $(B)/complete_test \
+      $(B)/theme_test
 	./$(B)/lexer_test
 	./$(B)/region_test
 	./$(B)/buffer_test
@@ -63,6 +65,12 @@ test: $(B)/lexer_test $(B)/region_test $(B)/buffer_test $(B)/indent_test $(B)/sc
 	./$(B)/call_test
 	./$(B)/bar_test
 	./$(B)/complete_test
+	./$(B)/theme_test
+
+# 0.9.13: named palettes of `@theme` (name lookup + invariants) — pure C++.
+$(B)/theme_test: tests/theme_test.cpp sc_theme.cpp sc_theme.h
+	@mkdir -p $(B)
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/theme_test.cpp sc_theme.cpp -o $@
 
 # S6c+: candidate engine of the completion session (text + caret -> candidate).
 $(B)/complete_test: tests/complete_test.cpp sc_complete.cpp sc_complete.h
@@ -143,14 +151,14 @@ $(B)/scroll_test: tests/scroll_test.cpp sc_scroll.cpp sc_scroll.h
 # S4: per-line token cache (needs the lexer and the buffer, not the Max object).
 $(B)/highlight_test: tests/highlight_test.cpp sc_highlight.cpp sc_highlight.h $(CORE_SRC) $(CORE_HDR)
 	@mkdir -p $(B)
-	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/highlight_test.cpp sc_highlight.cpp sc_lexer.cpp sc_buffer.cpp -o $@
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) tests/highlight_test.cpp sc_highlight.cpp sc_theme.cpp sc_lexer.cpp sc_buffer.cpp -o $@
 
 # --- S1: bundle `sc_code.mxo` --------------------------------------------------
 # Same scheme as keylog (DIRECTORY bundle + ad-hoc signature + jpatcher_syms.o),
 # but the code is the full editor. `sc_code` is pure UI: it links neither SC nor MSP
 # (every Max symbol is resolved by the host with -undefined dynamic_lookup).
 # Bundle version (keep it in sync with SC_CODE_VERSION in sc_code.cpp).
-SC_CODE_VER := 0.9.11
+SC_CODE_VER := 0.9.13
 
 $(B)/sc_code.mxo: $(UI_SRC) $(UI_HDR) bundle/Info.plist.in $(CORE_SRC) $(CORE_HDR) $(B)/jpatcher_syms.o
 	@mkdir -p $(B)/sc_code.mxo/Contents/MacOS
@@ -187,7 +195,7 @@ install-help:
 		echo "NOT copied: $(MAX_HELP)/sc_code.maxhelp is newer than help/sc_code.maxhelp"; \
 		echo "            (did you edit it in Max? copy it into the repo and install again)"; \
 	else \
-		cp "help/sc_code.maxhelp" "$(MAX_HELP)/sc_code.maxhelp"; \
+		cp -p "help/sc_code.maxhelp" "$(MAX_HELP)/sc_code.maxhelp"; \
 		echo "installed: $(MAX_HELP)/sc_code.maxhelp"; \
 	fi
 

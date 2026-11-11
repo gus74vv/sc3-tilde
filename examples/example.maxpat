@@ -9,8 +9,19 @@
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 43.0, 126.0, 1112.0, 710.0 ],
+        "rect": [ 43.0, 126.0, 1199.0, 710.0 ],
         "boxes": [
+            {
+                "box": {
+                    "id": "obj-27",
+                    "linecount": 13,
+                    "maxclass": "comment",
+                    "numinlets": 1,
+                    "numoutlets": 0,
+                    "patching_rect": [ 990.0, 528.0, 150.0, 181.0 ],
+                    "text": "<- sc_code colors: `@theme onedark` is the default (menu in the inspector). Also catppuccin,\n dracula, nord, gruvbox, monokai, solarized.\n   Or send the message `theme dracula`; `themes` posts the list.\n   A color set by hand (`@bgcolor …`) wins over the theme."
+                }
+            },
             {
                 "box": {
                     "id": "obj-3",

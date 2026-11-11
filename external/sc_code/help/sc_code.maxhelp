@@ -118,7 +118,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 740.0, 407.0, 267.0, 96.0 ],
-                    "text": "colors: @bgcolor @textcolor @selcolor @caretcolor @titlebar, and per token @keywordcolor @classcolor @builtincolor @primitivecolor @symbolcolor @charcolor @stringcolor @numbercolor @envvarcolor @commentcolor @bracketcolor @operatorcolor"
+                    "text": "THEME: @theme onedark (default; it is a menu in the Inspector) — also catppuccin, dracula, nord, gruvbox, monokai, solarized: the 21 colors below in one step, and a color set by hand wins over it. Messages: theme dracula · themes (the list).\ncolors: @bgcolor @textcolor @selcolor @caretcolor @curlinecolor (band on the line of the caret, alpha 0 turns it off) @titlebar, and per token @keywordcolor @classcolor @builtincolor @primitivecolor @symbolcolor @charcolor @stringcolor @numbercolor @envvarcolor @commentcolor @bracketcolor @operatorcolor — the factory palette is Catppuccin Mocha"
                 }
             },
             {
@@ -131,7 +131,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 740.0, 239.0, 267.0, 147.0 ],
-                    "text": "@blink 1 + @blinkduration 500 + @blinkcolor 1.0 0.55 0.15 0.40 — the evaluated block blinks (InCubic fade, the IDE curve).\n@scrollspeed 3. — factor for wheel and trackpad; 1 is slow, raise it for a trackpad (also a message: scrollspeed 4.).\n@file /path/x.scd + @autoload 1 (it loads when set) + @autowrite 1 (saves after edits, 400 ms debounce)."
+                    "text": "@blink 1 + @blinkduration 500 + @blinkcolor 0.980 0.702 0.529 0.40 — the evaluated block blinks (InCubic fade, the IDE curve).\n@scrollspeed 3. — factor for wheel and trackpad; 1 is slow, raise it for a trackpad (also a message: scrollspeed 4.).\n@file /path/x.scd + @autoload 1 (it loads when set) + @autowrite 1 (saves after edits, 400 ms debounce)."
                 }
             },
             {

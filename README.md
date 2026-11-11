@@ -6,8 +6,8 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.15.8 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
-| `sc_code` | 0.9.11 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
+| `sc3~` | 0.15.10 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc_code` | 0.9.13 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
  ┌─────────┐  eval <code>       ┌────────┐
@@ -202,8 +202,15 @@ Attributes: `@fontsize`, `@tabwidth`, `@linenumbers`, `@readonly`, `@autoclose`,
 `@wrap`, `@matchbrackets`, `@titlebar`, `@callaid` (the bottom bar, `1` by default),
 `@barcolor`, `@barhighlight` (the current argument), `@indexfile` (the class library
 dump), the per-token colours (`@keywordcolor`, `@stringcolor`, `@commentcolor`, …),
-`@bgcolor`, `@textcolor`, `@selcolor`, `@caretcolor`, `@blink`, `@blinkcolor`,
-`@blinkduration`, `@scrollspeed`.
+`@bgcolor`, `@textcolor`, `@selcolor`, `@caretcolor`, `@curlinecolor` (the line of the
+caret), `@blink`, `@blinkcolor`, `@blinkduration`, `@scrollspeed`.
+
+Colours: **`@theme`** sets the whole palette in one step — `onedark` (default) is
+`#282c34`/`#abb2bf` with violet keywords; also `catppuccin`, `dracula`, `nord`, `gruvbox`,
+`monokai` and `solarized`. It is a **menu in the inspector** (the list is generated from the
+same table), any name or alias can be typed, and `theme dracula` works through the inlet
+(`themes` posts the list). A colour set by hand wins over the theme, so
+`sc_code @theme nord @bgcolor 1 0 0 1` is nord with a red background.
 
 ### Call aid and the class library index
 

@@ -8,51 +8,66 @@
 #include "sc_highlight.h"
 
 #include "sc_buffer.h"
+#include "sc_theme.h"
 
 namespace sc_code {
 
 Color highlight_color(TokenType t) {
-	/* Dark palette, aligned with the IDE: dimmed comments, green strings,
-	 * orange symbols, blue numbers, light-blue classes, violet keywords. */
+	/* The table is the FACTORY palette (One Dark, `@theme onedark`): the numbers live in
+	 * sc_theme.cpp, so this function cannot drift from the object's defaults (0.9.13,
+	 * The object paints with its own attributes; this is the headless
+	 * reference of the default theme. */
+	const Theme &th = *theme_default();
+	const RGBA *c = &th.text;
 	switch (t) {
 	case Keyword:
-		return {0.80, 0.62, 0.95};
+		c = &th.keyword;
+		break;
 	case Builtin:
-		return {0.55, 0.85, 0.85};
+		c = &th.builtin;
+		break;
 	case Primitive:
-		return {0.90, 0.60, 0.90};
+		c = &th.primitive;
+		break;
 	case Class:
-		return {0.55, 0.78, 0.95};
+		c = &th.klass;
+		break;
 	case Symbol:
 	case SymbolMark:
 	case SymbolArg:
-		return {0.95, 0.72, 0.42};
+		c = &th.symbol;
+		break;
 	case StringMark:
-		return {0.65, 0.85, 0.55};
+		c = &th.string;
+		break;
 	case Char:
-		return {0.85, 0.86, 0.50};
+		c = &th.charlit;
+		break;
 	case RadixFloat:
 	case ScaleDegreeFloat:
 	case Float:
 	case HexInt:
-		return {0.62, 0.75, 1.0};
+		c = &th.number;
+		break;
 	case EnvVar:
-		return {0.95, 0.60, 0.45};
+		c = &th.envvar;
+		break;
 	case SingleLineComment:
 	case MultiLineCommentStart:
 	case MultiLineCommentEnd:
-		return {0.48, 0.56, 0.50};
+		c = &th.comment;
+		break;
 	case OpeningBracket:
 	case ClosingBracket:
-		return {0.78, 0.80, 0.86};
+		c = &th.bracket;
+		break;
 	case Operator:
-		return {0.85, 0.85, 0.92};
-	case WhiteSpace:
-	case Unknown:
-	case Name:
+		c = &th.op;
+		break;
 	default:
-		return {0.90, 0.91, 0.93}; /* normal text color */
+		break; /* WhiteSpace/Unknown/Name: the text color */
 	}
+	return {c->r, c->g, c->b};
 }
 
 namespace {
