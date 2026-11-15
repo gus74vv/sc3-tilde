@@ -17,7 +17,7 @@
  *
  * Phase track: S1 = buffer + paint + typing + eval. S2 = selection
  * (mouse drag / double / triple click, ⇧-click), `⌘A/C/V/X` with NSPasteboard and
- * `⌘Z`/`⇧⌘Z`. S3 = auto-close of pairs, autoindent on Return and `⌃.` panic (see
+ * `⌘Z`/`⇧⌘Z`. S3 = auto-close of pairs, autoindent on Return and `⌃.`/`⌘/` panic (see
  * 0.9.3). S4 = per-token highlight, with an incremental cache in `sc_highlight`.
  * S5 = scroll (brought forward), line-number gutter, attributes (colors, fontsize,
  * readonly, autoclose, tabwidth, linenumbers), `jsave`/`jload` and `@file` with
@@ -117,7 +117,7 @@
  * off). 0.9.13: `@theme <name>` with 7 presets — One Dark is the
  * factory palette and the menu of the Inspector is built from the table — plus the
  * individual colors still working as overrides. */
-#define SC_CODE_VERSION "0.9.13"
+#define SC_CODE_VERSION "0.9.14"
 
 /* The palette is an ATTRIBUTE per token group (S5b): the factory values live in
  * the CLASS_ATTR_DEFAULT of ext_main, not here. Only the colors that are not
@@ -2117,7 +2117,7 @@ static void sc_code_paint(t_sc_code *x, t_object *view) {
 	if (buf.length() == 0) {
 		jgraphics_set_source_rgba(g, x->textcolor.red, x->textcolor.green, x->textcolor.blue, 0.45);
 		jgraphics_move_to(g, text_x, x->title_h + PAD_Y + x->ascent);
-		jgraphics_show_text(g, "⇧⏎ line · ⌘⏎ region · ⌘⇧⏎ all · ⌃. panic");
+		jgraphics_show_text(g, "⇧⏎ line · ⌘⏎ region · ⌘⇧⏎ all · ⌃. ⌘/ panic");
 	}
 
 	jgraphics_restore(g);
@@ -2185,6 +2185,9 @@ static void sc_code_getdrawparams(t_sc_code *x, t_object *patcherview, t_jboxdra
 #define K_TAB (-5)
 #define K_ESC (-3) /* JKEY_ESC: Max does not grab it */
 #define K_PERIOD 46 /* '.' (⇧. gives 62 ⇒ panic compares keycode, not textcharacter) */
+#define K_SLASH 47 /* '/': `⌘/` is the second panic chord (0.9.14). Max delivers ASCII
+				   * keycodes, so '/' is 47 and not the 44 of a US-layout virtual keycode
+				   * (measured with the `keylog` spike, 14-nov: `⌘/` ⇒ kc=47 mod=cmd). */
 #define K_DELETE (-6)
 #define K_BACKSPACE (-7)
 #define K_UPARROW (-9)
@@ -2297,13 +2300,27 @@ static long sc_code_key(t_sc_code *x, t_object *patcherview, long keycode, long 
 		sc_code_compl_close(x);
 
 	/* ⌃. = panic (`CmdPeriod.run`), through the outlet ⇒ there is no global Max
-	 * shortcut. `⌘.` is still accepted (verified 30-oct: `⌘.` does NOT reach the
-	 * object — Max stops it in two layers that cannot be reassigned: the Cocoa
-	 * key-equivalent of the menu, which comes from `maxinterface.json` ⇒ entry
-	 * `stopscheduler`, and a JUCE command hardcoded in the Max binary that survives
-	 * that reassignment and has no key bindings UI. The macOS App Shortcuts do not
-	 * override it either). If it ever arrives, it is already covered. */
-	if (keycode == K_PERIOD && (cmd || ctrl)) {
+	 * shortcut. `⌘.` is still accepted. Max stops the scheduler in two layers that
+	 * cannot be reassigned (the Cocoa key-equivalent of the menu, which comes from
+	 * `maxinterface.json` ⇒ entry `stopscheduler`, plus a JUCE command hardcoded in
+	 * the Max binary that survives that reassignment and has no key bindings UI; the
+	 * macOS App Shortcuts do not override it either). Measured with the `keylog` spike
+	 * (14-nov): `⌘.` *does* reach this method (`kc=46 mod=cmd tc=0`) **and** Max still
+	 * runs its stop, so it is accepted but not usable as the only panic chord.
+	 *
+	 * 0.9.14 (user request): `/` is accepted **with ⌘** (`⌘/`). It sits right next
+	 * to `.`, so the chord keeps the same hand position and does not carry the SC
+	 * IDE's `Cmd+Period` memory (`.` is the note-off/pitch class symbol in SC).
+	 * Measured with the `keylog` spike (14-nov): `⌘/` ⇒ `kc=47 mod=cmd tc=0` — the
+	 * event arrives untouched (nothing in Max eats it, despite `maxinterface.json`
+	 * listing it for "Show Floating Inspector"). Note that Max zeroes
+	 * `textcharacter` when ⌘ is held (with ⌃ it still sends `'/'`), so the keycode is
+	 * the only usable criterion here; the textcharacter test stays as a fallback for
+	 * the ⌃ case and for a layout where the chord arrives without ⌘. `⌃/` is
+	 * deliberately NOT taken (it was never asked for). */
+	const bool slash_key = (keycode == K_SLASH || textcharacter == '/');
+	const bool panic_key = (keycode == K_PERIOD && (cmd || ctrl)) || (slash_key && cmd);
+	if (panic_key) {
 		object_post((t_object *)x, "panic");
 		outlet_anything(x->out_eval, gensym("panic"), 0, NULL);
 		return 1;

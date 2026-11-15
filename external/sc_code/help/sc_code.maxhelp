@@ -32,7 +32,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 20.0, 38.0, 760.0, 19.0 ],
-                    "text": "⇧⏎ line · ⌘⏎ region ( … ) · ⌘⇧⏎ document · ⇥ / ⇧⇥ completion · ⌃. panic  ·  click on 'open' boots sc3~"
+                    "text": "⇧⏎ line · ⌘⏎ region ( … ) · ⌘⇧⏎ document · ⇥ / ⇧⇥ completion · ⌃. ⌘/ panic  ·  click on 'open' boots sc3~"
                 }
             },
             {
