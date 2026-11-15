@@ -6,8 +6,8 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.15.10 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
-| `sc_code` | 0.9.13 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
+| `sc3~` | 0.15.11 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc_code` | 0.9.14 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
  ┌─────────┐  eval <code>       ┌────────┐
@@ -185,7 +185,7 @@ writes a file.
 | `⇧Return` | evaluate the current line |
 | `⌘Return` | evaluate the selection, else the enclosing `( … )` region, else the line |
 | `⌘⇧Return` | evaluate the whole buffer |
-| `⌃.` | panic (`⌘.` never reaches the object: Max eats it) |
+| `⌃.`, `⌘/` | panic (`⌘.` is Max's own stop and cannot be taken) |
 | `⌘Z` / `⇧⌘Z` | undo / redo |
 | `⌘X` `⌘C` `⌘V` | cut / copy / paste |
 | `⌘S` / `⌘O` | save / open `.scd` |
