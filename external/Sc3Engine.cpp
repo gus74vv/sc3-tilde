@@ -44,6 +44,11 @@
 #include "SC_World.h"
 #include "SC_WorldOptions.h"
 #include "scsynthsend.h" // small_scpacket (the /status.reply we write ourselves)
+#include "SC_Graph.h"           // Unit::mParent is a Graph*
+#include "SC_InterfaceTable.h" // fDoneAction (plugins call through it)
+#include "SC_Node.h"            // Node, Node_Delete, NodeCalcFunc
+#include "SC_Prototypes.h"      // World_GetNode, Node_Delete, Graph_Calc
+#include "SC_Unit.h"            // Unit (mParent)
 
 // World API outside the public headers: C++ (mangled) linkage, same as in
 // the world test. Do not declare inside extern "C".
@@ -52,6 +57,92 @@ void World_Start(struct World *inWorld);
 void World_SetSampleRate(struct World *inWorld, double inSampleRate);
 int PerformOSCMessage(struct World *inWorld, int inSize, char *inData, ReplyAddress *inAddr);
 void PerformOSCBundle(struct World *inWorld, struct OSC_Packet *inPacket);
+struct Graph;
+void Graph_FirstCalc(struct Graph *inGraph); // no prototype in SC_Prototypes.h
+
+// ---------------------------------------------------------------------------
+// a graph that ends inside its FIRST calc is resurrected by the core
+//
+// `Graph_FirstCalc` (SC_Graph.cpp:510) installs `Graph_Calc` on the node AFTER
+// running the unit constructors, unconditionally. A unit can end the graph from
+// its constructor: `EnvGen` does it as soon as the envelope is over in the very
+// first block, which is what happens when the `gate` control is already 0 before
+// the node is calculated — `Synth(\def, [\gate, 0])`, or a `PmonoArtic` with a
+// short `legato` when `/s_new` and `/n_set gate 0` land in the same block (that
+// is the case whenever the host block is longer than the World block, e.g. a
+// 512-frame signal vector: a 2.5 ms bundle offset cannot be separated).
+//
+// Then `Node_End` has already done its job (`mCalcFunc = Node_Delete`) and the
+// assignment overwrites it with `Graph_Calc`: the parent group never deletes the
+// node, and it stays in the tree forever, silent (`gate = 0`) but calculated
+// every block. One leaked node per note ⇒ the CPU that went from 1.8 % (scide)
+// to >30 % in Max.
+//
+// The core is vendored and pinned, so the repair lives here: `fDoneAction` is
+// wrapped, the nodes marked from inside `Graph_FirstCalc` are recorded, and
+// `advanceLocked` puts `Node_Delete` back right after `World_Run` (one block of
+// delay, exactly like any other ended node). Upstream it is two lines in
+// SC_Graph.cpp (only install the calc func if the ctors did not end the node).
+namespace {
+
+struct RevivedNode {
+	Node *node;
+	int32 id;
+};
+
+constexpr int kReviveCap = 8; // >8 nodes ending in the same block: not a use case
+RevivedNode gRevive[kReviveCap];
+int gReviveCount = 0;
+void (*gOrigDoneAction)(int, Unit *) = nullptr;
+
+void sc3DoneAction(int action, Unit *unit)
+{
+	// The calc function has to be read BEFORE the action runs: `Node_End` writes it.
+	const NodeCalcFunc before = (unit && unit->mParent) ? unit->mParent->mNode.mCalcFunc : nullptr;
+	if (gOrigDoneAction)
+		gOrigDoneAction(action, unit);
+	if (!unit || !unit->mParent)
+		return;
+	Node *n = &unit->mParent->mNode;
+	if (n->mCalcFunc != (NodeCalcFunc)&Node_Delete || before != (NodeCalcFunc)&Graph_FirstCalc)
+		return;
+	if (gReviveCount < kReviveCap) {
+		gRevive[gReviveCount].node = n;
+		gRevive[gReviveCount].id = n->mID;
+		++gReviveCount;
+	}
+}
+
+// Called right after World_Run: put back the marking `Graph_FirstCalc` erased.
+// The node library is the authority on "this id is still that object": if the
+// node was freed later in the same block (a `/n_free` or `g_freeAll` in the same
+// packet) the lookup fails and we never write into recycled memory.
+void repairRevived(World *w)
+{
+	for (int i = 0; i < gReviveCount; ++i) {
+		Node *n = gRevive[i].node;
+		if (World_GetNode(w, gRevive[i].id) != n)
+			continue;
+		if (!n->mIsGroup && n->mCalcFunc == (NodeCalcFunc)&Graph_Calc)
+			n->mCalcFunc = (NodeCalcFunc)&Node_Delete;
+	}
+	gReviveCount = 0;
+}
+
+// The interface table is process-global (`world->ft = &gInterfaceTable`), so this
+// survives teardown/boot of Worlds and must not wrap itself twice.
+void installDoneActionHook(World *w)
+{
+	static bool installed = false;
+	gReviveCount = 0; // a fresh World: anything recorded belongs to the old one
+	if (!w || !w->ft || installed)
+		return;
+	gOrigDoneAction = w->ft->fDoneAction;
+	w->ft->fDoneAction = &sc3DoneAction;
+	installed = true;
+}
+
+} // namespace
 
 namespace {
 
@@ -812,6 +903,7 @@ struct Sc3Engine::Impl {
 		if (feedInput)
 			feedInputLocked(w, bc); // 3.8: input buses ready for In/SoundIn
 		World_Run(w);
+		repairRevived(w); // undo the Graph_FirstCalc resurrection
 		copyToHistory(w, bc); // no-op during boot (empty hist)
 		w->mBufCounter++;
 		units.store(w->mNumUnits);
@@ -1163,6 +1255,7 @@ struct Sc3Engine::Impl {
 			return false;
 		}
 		world.store(w);
+		installDoneActionHook(w); // needs fDoneAction, see above
 		World_SetSampleRate(w, sr);
 		World_Start(w);
 		lastAdvanceNs.store(nowNs());
