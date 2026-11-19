@@ -9,12 +9,16 @@
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 215.0, 171.0, 748.0, 618.0 ],
+        "rect": [ 176.0, 146.0, 680.0, 720.0 ],
+        "default_fontsize": 13.0,
         "showrootpatcherontab": 0,
+        "showontab": 0,
         "boxes": [
             {
                 "box": {
-                    "id": "obj-23",
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
+                    "id": "obj-1",
                     "maxclass": "newobj",
                     "numinlets": 0,
                     "numoutlets": 0,
@@ -28,217 +32,121 @@
                             "modernui": 1
                         },
                         "classnamespace": "box",
-                        "rect": [ 0.0, 26.0, 748.0, 592.0 ],
+                        "rect": [ 176.0, 172.0, 680.0, 694.0 ],
+                        "default_fontsize": 13.0,
                         "showontab": 1,
                         "boxes": [
                             {
                                 "box": {
+                                    "border": 0,
+                                    "filename": "helpdetails.js",
                                     "id": "obj-1",
-                                    "maxclass": "newobj",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 22.0, 275.0, 67.0, 22.0 ],
-                                    "text": "s sc_editor"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "id": "obj-14",
-                                    "maxclass": "message",
-                                    "numinlets": 2,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "" ],
-                                    "patching_rect": [ 22.0, 214.0, 260.0, 22.0 ],
-                                    "text": "snippets '~/path with spaces/my_snippets.txt'"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
-                                    "id": "obj-13",
-                                    "linecount": 10,
-                                    "maxclass": "comment",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 22.0, 43.0, 492.0, 135.0 ],
-                                    "text": "SNIPPETS: `snippets <path>` (or @snippets, saved with the patch) loads a file of `### key` blocks plus verbatim code, no escapes — the release ships examples/sc_code-snippets.txt. The path can be relative, absolute, start with ~, and keep one pair of quotes (snippets '~/x y.txt' works). With the file loaded, evaluating `snip.key` REPLACES the text with the snippet and does NOT send eval to the engine (nothing is evaluated): the next ⌘⏎ does. It re-reads the file by itself when the mtime or the size changes. Each expansion posts the key that ran to the Max console as `-> kick` (the sclang look, no `sc_code:` prefix): since no eval leaves the box, that is the only confirmation of which snippet was inserted."
-                                }
-                            }
-                        ],
-                        "lines": [
-                            {
-                                "patchline": {
-                                    "destination": [ "obj-1", 0 ],
-                                    "source": [ "obj-14", 0 ]
-                                }
-                            }
-                        ]
-                    },
-                    "patching_rect": [ 165.33333333333334, 25.0, 63.0, 22.0 ],
-                    "text": "p snippets"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-22",
-                    "maxclass": "newobj",
-                    "numinlets": 0,
-                    "numoutlets": 0,
-                    "patcher": {
-                        "fileversion": 1,
-                        "appversion": {
-                            "major": 9,
-                            "minor": 2,
-                            "revision": 1,
-                            "architecture": "x64",
-                            "modernui": 1
-                        },
-                        "classnamespace": "box",
-                        "rect": [ 215.0, 197.0, 748.0, 592.0 ],
-                        "showontab": 1,
-                        "boxes": [
-                            {
-                                "box": {
-                                    "attr": "file",
-                                    "id": "obj-12",
-                                    "maxclass": "attrui",
+                                    "ignoreclick": 1,
+                                    "jsarguments": [ "sc_code", 90 ],
+                                    "maxclass": "jsui",
                                     "numinlets": 1,
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "parameter_enable": 0,
-                                    "patching_rect": [ 96.0, 46.0, 355.0, 22.0 ]
+                                    "patching_rect": [ 10.0, 10.0, 620.0, 125.0 ]
                                 }
                             },
                             {
                                 "box": {
-                                    "id": "obj-6",
-                                    "maxclass": "newobj",
-                                    "numinlets": 0,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "" ],
-                                    "patching_rect": [ 19.0, 46.0, 65.0, 22.0 ],
-                                    "text": "r sc_editor"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "id": "obj-19",
-                                    "maxclass": "newobj",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 155.0, 536.0, 61.0, 22.0 ],
-                                    "text": "print error"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "id": "obj-18",
-                                    "maxclass": "newobj",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 223.0, 536.0, 95.0, 22.0 ],
-                                    "text": "print sc_console"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "fontface": 1,
-                                    "fontname": "Menlo",
-                                    "fontsize": 14.0,
-                                    "id": "obj-1",
-                                    "maxclass": "comment",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 19.0, 15.0, 478.0, 23.0 ],
-                                    "text": "sc_code — in-patch sclang code editor for sc3~  (0.9.8)"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 12.0,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
                                     "id": "obj-2",
-                                    "linecount": 6,
-                                    "maxclass": "comment",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 464.0, 149.0, 246.0, 90.0 ],
-                                    "text": "⇧⏎ line\n⌘⏎ region ( … )\n⌘⇧⏎ document\n⇥ / ⇧⇥ completion\n⌃. ⌘/ panic\nclick on 'open' boots sc3~"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "id": "obj-3",
-                                    "indexfile": "",
-                                    "maxclass": "sc_code",
-                                    "numinlets": 1,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "" ],
-                                    "patching_rect": [ 19.0, 81.0, 432.0, 376.0 ],
-                                    "sc_code_caret": 155,
-                                    "sc_code_scroll": 0,
-                                    "sc_code_text": "// mono out only\n{ [SinOsc.ar(440, 0, 0.1), DC.ar(0)] }.play;\n\n// panned slowly left to right\n{ Pan2.ar(SinOsc.ar(440, 0, 0.1), SinOsc.kr(0.2)) }.play;  \n\n",
-                                    "snippets": ""
-                                }
-                            },
-                            {
-                                "box": {
-                                    "id": "obj-4",
                                     "maxclass": "message",
                                     "numinlets": 2,
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
-                                    "patching_rect": [ 41.0, 467.0, 60.0, 22.0 ],
+                                    "patching_rect": [ 20.0, 140.0, 44.0, 23.0 ],
                                     "text": "open"
                                 }
                             },
                             {
                                 "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 70.0, 139.0, 144.0, 25.0 ],
+                                    "text": "boot the engine first"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-4",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 175.0, 620.0, 260.0 ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Shift+Return      evaluate this line\n// Cmd+Return        evaluate the selection, else the ( ... ) block, else the line\n// Cmd+Shift+Return  evaluate everything\n// Ctrl+. or Cmd+/   panic (Cmd+. stops Max's scheduler: do not use it)\n\n{ SinOsc.ar([300, 302], 0, 0.1) }.play;\n\n(\n{\n    var env = EnvGen.kr(Env.perc(0.01, 2), doneAction: 2);\n    Splay.ar(SinOsc.ar([200, 250, 300, 375]) * env * 0.1)\n}.play;\n)\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
                                     "id": "obj-5",
                                     "maxclass": "newobj",
                                     "numinlets": 1,
                                     "numoutlets": 4,
                                     "outlettype": [ "signal", "signal", "", "" ],
-                                    "patching_rect": [ 19.0, 496.0, 223.0, 22.0 ],
-                                    "text": "sc3~"
+                                    "patching_rect": [ 20.0, 455.0, 62.0, 23.0 ],
+                                    "text": "sc3~ 2"
                                 }
                             },
                             {
                                 "box": {
-                                    "id": "obj-7",
+                                    "id": "obj-6",
                                     "maxclass": "ezdac~",
                                     "numinlets": 2,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 19.0, 536.0, 45.0, 45.0 ]
+                                    "patching_rect": [ 20.0, 495.0, 45.0, 45.0 ]
                                 }
                             },
                             {
                                 "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 12.0,
-                                    "id": "obj-8",
-                                    "linecount": 14,
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "linecount": 2,
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 464.0, 250.0, 247.0, 202.0 ],
-                                    "text": "The buffer is saved with the patch (jsave/jload): a reopened patch brings the editor back as it was. The outlet emits eval <code> (ONE symbol, multi-line, no temp file) or panic — connect it to sc3~.\n\n⌘⏎ evaluates the ( … ) region under the caret or, if there is none, the line: multi-line { … } and [ … ] are not regions (as in the IDE) ⇒ select the block or use ⌘⇧⏎."
+                                    "patching_rect": [ 93.0, 461.0, 547.0, 40.0 ],
+                                    "text": "The outlet sends eval <code> as ONE symbol, so line breaks, commas and quotes arrive intact. Return auto-indents; brackets and quotes close themselves; Cmd+Z undoes."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 555.0, 620.0, 36.0 ],
+                                    "text": "Right-click: Undo, Redo, Cut, Copy, Paste, Delete, Select All, Save to .scd, Load from .scd. Drop files from the Finder to insert their paths as strings. The text is saved with the patch."
                                 }
                             }
                         ],
                         "lines": [
                             {
                                 "patchline": {
-                                    "destination": [ "obj-3", 0 ],
-                                    "midpoints": [ 105.5, 72.88671875, 28.5, 72.88671875 ],
-                                    "source": [ "obj-12", 0 ]
-                                }
-                            },
-                            {
-                                "patchline": {
                                     "destination": [ "obj-5", 0 ],
-                                    "source": [ "obj-3", 0 ]
+                                    "source": [ "obj-2", 0 ]
                                 }
                             },
                             {
@@ -249,43 +157,374 @@
                             },
                             {
                                 "patchline": {
-                                    "destination": [ "obj-18", 0 ],
-                                    "source": [ "obj-5", 3 ]
-                                }
-                            },
-                            {
-                                "patchline": {
-                                    "destination": [ "obj-19", 0 ],
-                                    "source": [ "obj-5", 2 ]
-                                }
-                            },
-                            {
-                                "patchline": {
-                                    "destination": [ "obj-7", 1 ],
+                                    "destination": [ "obj-6", 1 ],
                                     "source": [ "obj-5", 1 ]
                                 }
                             },
                             {
                                 "patchline": {
-                                    "destination": [ "obj-7", 0 ],
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-5", 0 ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [ 10.0, 140.0, 70.0, 23.0 ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p basic"
+                }
+            },
+            {
+                "box": {
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
+                    "id": "obj-2",
+                    "maxclass": "newobj",
+                    "numinlets": 0,
+                    "numoutlets": 0,
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [ 0.0, 26.0, 680.0, 694.0 ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 15.0, 620.0, 21.0 ],
+                                    "text": "@theme sets every color in one step. A color set by hand wins over the theme. Click the messages:"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 60.0, 116.0, 23.0 ],
+                                    "text": "theme onedark"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 144.0, 60.0, 140.0, 23.0 ],
+                                    "text": "theme catppuccin"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 292.0, 60.0, 116.0, 23.0 ],
+                                    "text": "theme dracula"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 416.0, 60.0, 92.0, 23.0 ],
+                                    "text": "theme nord"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 516.0, 60.0, 116.0, 23.0 ],
+                                    "text": "theme gruvbox"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 60.0, 116.0, 23.0 ],
+                                    "text": "theme monokai"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 144.0, 60.0, 132.0, 23.0 ],
+                                    "text": "theme solarized"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-9",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 125.0, 60.0, 23.0 ],
+                                    "text": "themes"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "bgcolor",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-10",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 100.0, 125.0, 220.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "fontsize",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-11",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 330.0, 125.0, 150.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "linenumbers",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-12",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 20.0, 160.0, 150.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "wrap",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-13",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 180.0, 160.0, 128.5, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "titlebar",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-14",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 310.0, 160.0, 140.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "tabwidth",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-15",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 460.0, 160.0, 150.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-16",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 200.0, 620.0, 240.0 ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Every token class has its own color attribute:\n// @keywordcolor @classcolor @symbolcolor @stringcolor @numbercolor ...\n(\nvar freqs = [220, 330, 440];  // a comment\n~drone = { |amp = 0.05|\n    Splay.ar(SinOsc.ar(freqs * LFNoise1.kr(0.2).range(0.99, 1.01))) * amp\n}.play(fadeTime: 2);\n\\symbol; 'quoted'; \"a string\"; $c; 0x1F; 1.5e3;\n)\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-17",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 460.0, 620.0, 21.0 ],
+                                    "text": "themes posts the names to the Max console. @theme is also a menu in the inspector."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-10", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-11", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-12", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-13", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-14", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-15", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-2", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-3", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-4", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
                                     "source": [ "obj-5", 0 ]
                                 }
                             },
                             {
                                 "patchline": {
-                                    "destination": [ "obj-3", 0 ],
+                                    "destination": [ "obj-16", 0 ],
                                     "source": [ "obj-6", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-7", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-8", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-16", 0 ],
+                                    "source": [ "obj-9", 0 ]
                                 }
                             }
                         ]
                     },
-                    "patching_rect": [ 21.0, 25.0, 42.0, 22.0 ],
-                    "text": "p intro"
+                    "patching_rect": [ 90.0, 140.0, 78.0, 23.0 ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p themes"
                 }
             },
             {
                 "box": {
-                    "id": "obj-21",
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
+                    "id": "obj-3",
                     "maxclass": "newobj",
                     "numinlets": 0,
                     "numoutlets": 0,
@@ -299,118 +538,542 @@
                             "modernui": 1
                         },
                         "classnamespace": "box",
-                        "rect": [ 0.0, 26.0, 748.0, 592.0 ],
+                        "rect": [ 0.0, 26.0, 680.0, 694.0 ],
+                        "default_fontsize": 13.0,
                         "showontab": 1,
                         "boxes": [
                             {
                                 "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
-                                    "id": "obj-15",
-                                    "linecount": 5,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "linecount": 3,
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 17.0, 246.0, 432.0, 71.0 ],
-                                    "text": "DROP: a file dragged from the Finder onto the box lands as its quoted ABSOLUTE path at the caret (\"/Users/you/Documents/x.wav\"), one undo step, with the patcher locked or unlocked. Absolute on purpose: sclang does not expand ~, so this text goes into SoundFile.openRead as it is."
+                                    "patching_rect": [ 20.0, 15.0, 620.0, 50.0 ],
+                                    "text": "The bottom bar shows the signature of the call under the caret, with the current argument highlighted, and completions from three letters (Tab inserts, Shift+Tab cycles, Esc closes). Its data is an index file that sclang writes once."
                                 }
                             },
                             {
                                 "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
-                                    "id": "obj-16",
-                                    "linecount": 13,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 105.0, 44.0, 23.0 ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 17.0, 22.0, 465.0, 173.0 ],
-                                    "text": "BAR: @callaid 1 (default) reserves the bottom line for the call under the caret: signature, current argument in @barhighlight, n/N on the right, @barcolor. The data is the class library index: send `index` once, sclang writes ~/Documents/Max 9/Library/sc_code-index.txt (one file for every sc_code, @indexfile overrides the path); send it again after installing Quarks or updating SC.\nCOMPLETION: automatic and display-only — at three letters the bar shows the best candidate; ⇥ inserts it (one undo step), ⇧⇥ cycles, Esc closes, typing filters, ⏎ is never taken (it still evaluates / breaks the line). After `Class.` the list holds only the methods of that class. ⌃Space opens it with no prefix, but macOS or Max usually eats that key. ⇥ at a clean argument start writes the IDE template: SinOsc.ar( + ⇥ ⇒ `freq: `."
+                                    "patching_rect": [ 70.0, 102.0, 220.0, 25.0 ],
+                                    "text": "1. boot the engine"
                                 }
-                            }
-                        ],
-                        "lines": []
-                    },
-                    "patching_rect": [ 89.66666666666667, 25.0, 49.0, 22.0 ],
-                    "text": "p editor"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-20",
-                    "maxclass": "newobj",
-                    "numinlets": 0,
-                    "numoutlets": 0,
-                    "patcher": {
-                        "fileversion": 1,
-                        "appversion": {
-                            "major": 9,
-                            "minor": 2,
-                            "revision": 1,
-                            "architecture": "x64",
-                            "modernui": 1
-                        },
-                        "classnamespace": "box",
-                        "rect": [ 0.0, 26.0, 748.0, 592.0 ],
-                        "showontab": 1,
-                        "boxes": [
+                            },
                             {
                                 "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 300.0, 105.0, 52.0, 23.0 ],
+                                    "text": "index"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 355.0, 102.0, 291.0, 40.0 ],
+                                    "text": "2. write the index (once; again after new Quarks)"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-6",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 150.0, 620.0, 200.0 ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// 3. Click inside the parentheses below and move the caret:\n{ SinOsc.ar(440, 0, 0.1) }.play;\n\n// 4. Type a class name and a dot, e.g. LFNoi  or  Pulse.\n\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [ "signal", "signal", "", "" ],
+                                    "patching_rect": [ 20.0, 370.0, 62.0, 23.0 ],
+                                    "text": "sc3~ 2"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-8",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 410.0, 45.0, 45.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "callaid",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
                                     "id": "obj-9",
-                                    "linecount": 5,
-                                    "maxclass": "comment",
+                                    "maxclass": "attrui",
                                     "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 12.0, 19.0, 267.0, 71.0 ],
-                                    "text": "@linenumbers 1 · @fontsize 12 · @tabwidth 4 · @readonly 0 · @autoclose 1 · @wrap 1 (the text reflows to the box width) · @matchbrackets 1 + @matchcolor (pair at the caret)"
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 300.0, 370.0, 150.0, 23.0 ]
                                 }
                             },
                             {
                                 "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
+                                    "attr": "barhighlight",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
                                     "id": "obj-10",
-                                    "linecount": 7,
-                                    "maxclass": "comment",
+                                    "maxclass": "attrui",
                                     "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 12.0, 347.0, 631.0, 96.0 ],
-                                    "text": "THEME: @theme onedark (default; it is a menu in the Inspector) — also catppuccin, dracula, nord, gruvbox, monokai, solarized: the 21 colors below in one step, and a color set by hand wins over it. Messages: theme dracula · themes (the list).\ncolors: @bgcolor @textcolor @selcolor @caretcolor @curlinecolor (band on the line of the caret, alpha 0 turns it off) @titlebar, and per token @keywordcolor @classcolor @builtincolor @primitivecolor @symbolcolor @charcolor @stringcolor @numbercolor @envvarcolor @commentcolor @bracketcolor @operatorcolor — the factory palette is Catppuccin Mocha"
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 460.0, 370.0, 180.0, 23.0 ]
                                 }
                             },
                             {
                                 "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
                                     "id": "obj-11",
-                                    "linecount": 11,
+                                    "linecount": 3,
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 12.0, 179.0, 267.0, 147.0 ],
-                                    "text": "@blink 1 + @blinkduration 500 + @blinkcolor 0.980 0.702 0.529 0.40 — the evaluated block blinks (InCubic fade, the IDE curve).\n@scrollspeed 3. — factor for wheel and trackpad; 1 is slow, raise it for a trackpad (also a message: scrollspeed 4.).\n@file /path/x.scd + @autoload 1 (it loads when set) + @autowrite 1 (saves after edits, 400 ms debounce)."
-                                }
-                            },
-                            {
-                                "box": {
-                                    "fontname": "Menlo",
-                                    "fontsize": 11.0,
-                                    "id": "obj-12",
-                                    "linecount": 4,
-                                    "maxclass": "comment",
-                                    "numinlets": 1,
-                                    "numoutlets": 0,
-                                    "patching_rect": [ 12.0, 108.0, 273.0, 58.0 ],
-                                    "text": "Right click: Undo/Redo, Cut/Copy/Paste/Delete, Select All, Save to .scd and Load from .scd (Save sets @file to the chosen path)."
+                                    "patching_rect": [ 80.0, 420.0, 560.0, 50.0 ],
+                                    "text": "index sends an eval through the outlet, so sc3~ must be running. The file is sc_code-index.txt next to sc_code.mxo, shared by every sc_code; @indexfile points elsewhere. The editor only reads it."
                                 }
                             }
                         ],
-                        "lines": []
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-10", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-7", 0 ],
+                                    "source": [ "obj-2", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-4", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-7", 0 ],
+                                    "source": [ "obj-6", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-8", 1 ],
+                                    "source": [ "obj-7", 1 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-8", 0 ],
+                                    "source": [ "obj-7", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-9", 0 ]
+                                }
+                            }
+                        ]
                     },
-                    "patching_rect": [ 255.0, 25.0, 68.0, 22.0 ],
-                    "text": "p attributes"
+                    "patching_rect": [ 178.0, 140.0, 94.0, 23.0 ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p call aid"
+                }
+            },
+            {
+                "box": {
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
+                    "id": "obj-4",
+                    "maxclass": "newobj",
+                    "numinlets": 0,
+                    "numoutlets": 0,
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [ 0.0, 26.0, 680.0, 694.0 ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "linecount": 3,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 15.0, 620.0, 50.0 ],
+                                    "text": "A snippets file holds blocks: a line ### key, then the code verbatim. Type snip.key and press Cmd+Return: the text is replaced by the block and nothing is evaluated. Cmd+Return again evaluates it. This package ships examples/sc_code-snippets.txt with keys 1 to 4."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 105.0, 612.0, 23.0 ],
+                                    "text": "snippets ~/Documents/Max 9/Packages/sc3-tilde/examples/sc_code-snippets.txt"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "bubbleside": 0,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 135.0, 644.0, 40.0 ],
+                                    "text": "Edit the path if the package lives elsewhere. Spaces are fine. The path is saved with the patch (@snippets)."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 190.0, 44.0, 23.0 ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-5",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 225.0, 620.0, 200.0 ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Put the caret on the next line and press Cmd+Return, twice:\nsnip.1\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [ "signal", "signal", "", "" ],
+                                    "patching_rect": [ 20.0, 445.0, 62.0, 23.0 ],
+                                    "text": "sc3~ 2"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-7",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 485.0, 45.0, 45.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 80.0, 495.0, 52.0, 23.0 ],
+                                    "text": "panic"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-9",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 545.0, 731.0, 21.0 ],
+                                    "text": "An unknown key leaves the text untouched and lists the available keys in the Max console. The file is reread when it changes."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-5", 0 ],
+                                    "source": [ "obj-2", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-4", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-5", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-7", 1 ],
+                                    "source": [ "obj-6", 1 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-7", 0 ],
+                                    "source": [ "obj-6", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-8", 0 ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [ 282.0, 140.0, 94.0, 23.0 ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p snippets"
+                }
+            },
+            {
+                "box": {
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
+                    "id": "obj-5",
+                    "maxclass": "newobj",
+                    "numinlets": 0,
+                    "numoutlets": 0,
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [ 0.0, 26.0, 680.0, 694.0 ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 15.0, 620.0, 36.0 ],
+                                    "text": "@file links the editor to an .scd file. @autoload 1 (default) loads it when @file is set; @autowrite 1 writes every edit back 400 ms after you stop typing. Right-click > Save to .scd sets @file for you."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "file",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 20.0, 85.0, 300.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "autoload",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 330.0, 85.0, 150.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "autowrite",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 20.0, 112.0, 150.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "attr": "readonly",
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "maxclass": "attrui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [ 180.0, 112.0, 150.0, 23.0 ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-6",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [ "" ],
+                                    "patching_rect": [ 20.0, 145.0, 620.0, 190.0 ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Right-click > Save to .scd, then type here with autowrite 1:\n// the file follows the editor.\n// readonly 1 still lets you select, copy and evaluate.\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [ 20.0, 355.0, 620.0, 21.0 ],
+                                    "text": "Drop a sound file from the Finder into the editor: its path arrives as a string, ready for Buffer.read(s, ...)."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-2", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-3", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-4", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "obj-6", 0 ],
+                                    "source": [ "obj-5", 0 ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [ 386.0, 140.0, 70.0, 23.0 ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p files"
                 }
             }
         ],

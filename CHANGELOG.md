@@ -24,7 +24,13 @@ Changes in this fork, relative to upstream [gus74vv/sc3-tilde](https://github.co
 
 - `sc3~` outlets follow the MSP convention: audio first, left to right `ch 0 … ch n-1`, then `error`, then `post` (rightmost). The audio outlets used to be rightmost. Patches saved with the old layout reconnect by outlet index, so their audio cables now land on the wrong outlets; the bundled help and example patches are rewired. `sc3~.maxhelp` also had its two `dac~` cables crossed, which swapped left and right; they are straightened.
 
+- Reference pages `docs/sc3~.maxref.xml` and `docs/sc_code.maxref.xml` document every message, attribute, argument, inlet and outlet registered in the source. Max shows them in the reference window and in the help header.
+
+- New tabbed help patchers. `sc3~.maxhelp`: basic, buses (two objects on one engine), control (`set`, `send`, text outlets), input (`@ins`), stopping (`freeall`, `panic`, `hardstop`). `sc_code.maxhelp`: basic, themes, call aid, snippets, files. Each tab has a preloaded editor; every code unit compiles in sclang 3.14.1. The previous help files are kept as `sc3~-legacy.maxhelp` and `sc_code-legacy.maxhelp`.
+
 ### Fixed
+
+- The README listed Cmd+S and Cmd+O for `sc_code`, which binds neither, and a panic item in its context menu, which has none. It also described `hardstop` as silencing the DSP chain; it runs `CmdPeriod.hardRun` and audio keeps running.
 
 - The SuperCollider statics were built for the host macOS (26.0) while `sc3~` targets 11.0. `make sc` pins arm64 and macOS 11.0.
 

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml-stylesheet href="./_c74_ref.xsl" type="text/xsl"?>
+
+<c74object name="sc3~" module="msp" category="sc3-tilde">
+	<digest>
+		SuperCollider (sclang + scsynth) inside Max
+	</digest>
+	<description>
+		Runs the SuperCollider 3.14.1 language (sclang) and synthesis server (scsynth) in the Max process. Send it SuperCollider code with <m>eval</m>; the audio of the SuperCollider buses it serves comes out of its signal outlets. The class library and the UGen plugins are bundled, so no SuperCollider installation is needed.
+	</description>
+
+	<!--METADATA-->
+	<metadatalist>
+		<metadata name="author">gus74vv</metadata>
+		<metadata name="tag">sc3-tilde</metadata>
+		<metadata name="tag">SuperCollider</metadata>
+		<metadata name="tag">MSP Synthesis</metadata>
+		<metadata name="tag">live coding</metadata>
+	</metadatalist>
+
+	<!--INLETS-->
+	<inletlist>
+		<inlet id="0" type="message">
+			<digest>
+				Messages: code and engine control
+			</digest>
+			<description>
+				Receives <m>eval</m>, <m>open</m>, <m>panic</m> and the other messages below. Connect the outlet of <o>sc_code</o> here.
+			</description>
+		</inlet>
+		<inlet id="1" type="signal">
+			<digest>
+				Audio input channel 0 (only with <at>ins</at>)
+			</digest>
+			<description>
+				With <at>ins</at> N, inlets 1 to N are signal inlets. Inlet i+1 is read by <m>SoundIn.ar(i)</m> in SuperCollider. The input path adds two signal vectors of latency. Only one <o>sc3~</o> per engine owns the input.
+			</description>
+		</inlet>
+	</inletlist>
+
+	<!--OUTLETS-->
+	<outletlist>
+		<outlet id="0" type="signal">
+			<digest>
+				Audio channel 0 (one outlet per channel)
+			</digest>
+			<description>
+				With n channels, outlets 0 to n-1 carry channels 0 to n-1, read from SuperCollider buses <i>bus</i> to <i>bus</i>+n-1 (see the arguments).
+			</description>
+		</outlet>
+		<outlet id="1" type="symbol">
+			<digest>
+				Errors (outlet n)
+			</digest>
+			<description>
+				<m>error</m> followed by the text of an engine failure: boot errors, sclang exceptions, server failures. Also mirrored to the Max console while <at>console</at> is 1.
+			</description>
+		</outlet>
+		<outlet id="2" type="symbol">
+			<digest>
+				SuperCollider console (outlet n+1, rightmost)
+			</digest>
+			<description>
+				<m>post</m> followed by a chunk of the SuperCollider post window: results, <m>postln</m>, <m>poll</m>, warnings. Long text is cut at line breaks. Also mirrored to the Max console while <at>console</at> is 1.
+			</description>
+		</outlet>
+	</outletlist>
+
+	<!--ARGUMENTS-->
+	<objarglist>
+		<objarg name="channels" optional="1" type="int">
+			<digest>
+				Number of output channels (default 2)
+			</digest>
+			<description>
+				Number of signal outlets, from 1 to 16. In the evaluated code, <m>~sc3n</m> holds this number.
+			</description>
+		</objarg>
+		<objarg name="bus" optional="1" type="int">
+			<digest>
+				First SuperCollider bus to serve (default 0)
+			</digest>
+			<description>
+				The outlets carry buses <i>bus</i> to <i>bus</i>+<i>channels</i>-1 of the 64-bus pool. In the evaluated code, <m>~sc3out</m> holds this number, so <m>Out.ar(~sc3out, sig)</m> and a bare <m>.play</m> land on this object's outlets. Two objects with different buses, such as <o>sc3~ 2 0</o> and <o>sc3~ 2 2</o>, share one engine and play separate material.
+			</description>
+		</objarg>
+	</objarglist>
+
+	<!--MESSAGES-->
+	<methodlist>
+		<method name="bang">
+			<arglist />
+			<digest>
+				Boot if needed, then post the state
+			</digest>
+			<description>
+				Boots the engine if it is not running or the last boot failed, then posts the same report as <m>info</m>.
+			</description>
+		</method>
+		<method name="open">
+			<arglist />
+			<digest>
+				Boot the engine, or attach to the running one
+			</digest>
+			<description>
+				Starts sclang and the server in the background (about 4 seconds); Max stays responsive and the console reports <m>booting</m> then <m>ready</m>. If another <o>sc3~</o> already booted the engine, <m>open</m> attaches this object to it at once. Retries a failed boot. Does nothing if this object is already open.
+			</description>
+		</method>
+		<method name="close">
+			<arglist />
+			<digest>
+				Detach; shut the engine down with the last object
+			</digest>
+			<description>
+				Detaches this object. The engine shuts down when the last attached <o>sc3~</o> closes.
+			</description>
+		</method>
+		<method name="info">
+			<arglist />
+			<digest>
+				Post the engine state
+			</digest>
+			<description>
+				Posts the version, engine state (<m>booting</m>, <m>ready</m>, <m>failed</m> with its cause), UDP port, sample rate, block size, channels, buses, the class library and plugin paths, and <m>busy=</m>, the milliseconds of the eval in progress.
+			</description>
+		</method>
+		<method name="eval">
+			<arglist>
+				<arg name="code" optional="0" type="list" />
+			</arglist>
+			<digest>
+				Evaluate SuperCollider code
+			</digest>
+			<description>
+				Evaluates the code as one expression, as the SuperCollider IDE does; use <m>( ... )</m> around several statements. Attaches to a running engine. Before the code runs, <m>~sc3out</m> and <m>~sc3n</m> are set to this object's first bus and channel count. <o>sc_code</o> sends the code as one symbol, so line breaks, commas and quotes arrive intact. From a message box, Max splits the text at commas and removes backslashes; use <m>set</m> or <m>send</m> there.
+			</description>
+		</method>
+		<method name="evalfile">
+			<arglist>
+				<arg name="path" optional="0" type="symbol" />
+			</arglist>
+			<digest>
+				Evaluate the contents of a file
+			</digest>
+			<description>
+				Reads the file (absolute path, or relative to the Max working directory) and evaluates it like <m>eval</m>.
+			</description>
+		</method>
+		<method name="send">
+			<arglist>
+				<arg name="message" optional="0" type="list" />
+			</arglist>
+			<digest>
+				Evaluate an SC message without quoting
+			</digest>
+			<description>
+				Joins the atoms with spaces, appends <m>;</m> and evaluates the result: <m>send s.freeAll</m> evaluates <m>s.freeAll;</m>. Unlike <m>eval</m>, <m>~sc3out</m> and <m>~sc3n</m> are not set first.
+			</description>
+		</method>
+		<method name="set">
+			<arglist>
+				<arg name="target" optional="0" type="symbol" />
+				<arg name="key-value-pairs" optional="0" type="list" />
+			</arglist>
+			<digest>
+				Set Synth or Node arguments from Max
+			</digest>
+			<description>
+				<m>set x freq 81 amp 0.2</m> evaluates <m>x.set(\freq, 81, \amp, 0.2);</m>. The backslashes and commas are generated here, because a message box cannot carry them. The target is any SuperCollider expression without spaces (<m>x</m>, <m>~synth</m>). Keys must be symbols. Drive it with <o>number</o> into <o>prepend</o> <m>set x freq</m>.
+			</description>
+		</method>
+		<method name="panic">
+			<arglist />
+			<digest>
+				Stop everything: CmdPeriod.run
+			</digest>
+			<description>
+				Equivalent to Cmd+. in the SuperCollider IDE: frees all nodes, clears the clocks (Routines, Tasks, patterns) and runs the CmdPeriod hooks. A 8 ms fade to silence comes first, so the cut does not click. Audio processing continues. Do not press Cmd+. in Max: there it stops the Max scheduler.
+			</description>
+		</method>
+		<method name="stop">
+			<arglist />
+			<digest>
+				Same as <m>panic</m>
+			</digest>
+			<description>
+				Same as <m>panic</m>.
+			</description>
+		</method>
+		<method name="hardstop">
+			<arglist />
+			<digest>
+				Stop everything, including TempoClock.default: CmdPeriod.hardRun
+			</digest>
+			<description>
+				Like <m>panic</m>, and also clears <m>TempoClock.default</m>.
+			</description>
+		</method>
+		<method name="freeall">
+			<arglist />
+			<digest>
+				Free all nodes; clocks keep running
+			</digest>
+			<description>
+				Runs <m>s.freeAll</m>: frees the server nodes. Routines and clocks keep running, so a running pattern makes new sound.
+			</description>
+		</method>
+		<method name="console">
+			<arglist>
+				<arg name="on" optional="0" type="int" />
+			</arglist>
+			<digest>
+				Mirror the engine text to the Max console
+			</digest>
+			<description>
+				Sets <at>console</at> for this object only.
+			</description>
+		</method>
+		<method name="debug">
+			<arglist>
+				<arg name="on" optional="0" type="int" />
+			</arglist>
+			<digest>
+				Dump each eval to a file
+			</digest>
+			<description>
+				With 1, every <m>eval</m> is written to <m>/tmp/sc3_eval_last.scd</m> before it runs. Applies to every <o>sc3~</o>.
+			</description>
+		</method>
+		<method name="port">
+			<arglist>
+				<arg name="port" optional="0" type="int" />
+			</arglist>
+			<digest>
+				Set the server UDP port
+			</digest>
+			<description>
+				Same as <at>port</at>.
+			</description>
+		</method>
+		<method name="signal">
+			<arglist />
+			<digest>
+				Audio input (inlets 1 to N, with <at>ins</at>)
+			</digest>
+			<description>
+				Signal inlet i+1 is read by <m>SoundIn.ar(i)</m>.
+			</description>
+		</method>
+	</methodlist>
+
+	<!--ATTRIBUTES-->
+	<attributelist>
+		<attribute name="ins" get="1" set="1" type="int" size="1">
+			<digest>
+				Number of audio input inlets (0 to 16)
+			</digest>
+			<description>
+				Adds N signal inlets to the right of the message inlet. Fixed when the object is created: type it in the object box (<o>sc3~ 2 @ins 2</o>) and recreate the object to change it.
+			</description>
+		</attribute>
+		<attribute name="port" get="1" set="1" type="int" size="1">
+			<digest>
+				Server UDP port (0 = automatic)
+			</digest>
+			<description>
+				With 0 (the default) the kernel picks a free port, so the SuperCollider IDE and its server can run at the same time. <m>info</m> shows the port in use. The port is fixed by the <o>sc3~</o> that boots the engine; a change applies after <m>close</m> and <m>open</m>.
+			</description>
+		</attribute>
+		<attribute name="console" get="1" set="1" type="int" size="1">
+			<digest>
+				Mirror the engine text to the Max console (default 1)
+			</digest>
+			<description>
+				With 1, the text of the error and post outlets also prints in the Max console, formatted like the SuperCollider post window. Set 0 when <o>print</o> objects are connected to the outlets, so each line prints once. Per object: it never silences another patch. The <m>open</m>, <m>close</m>, <m>panic</m> and <m>hardstop</m> notices always print.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="allowscversion" get="1" set="1" type="int" size="1">
+			<digest>
+				Accept an installed SuperCollider of another minor version
+			</digest>
+			<description>
+				Only matters when the environment variable <m>SC3_APP_PATH</m> points the engine at an installed SuperCollider.app instead of the bundled class library. That app must match the engine's major.minor version (3.14.x) unless this attribute is 1.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+	</attributelist>
+
+	<!--SEEALSO-->
+	<seealsolist>
+		<seealso name="sc_code" />
+		<seealso name="dac~" />
+		<seealso name="adc~" />
+		<seealso name="print" />
+	</seealsolist>
+
+	<discussion>
+		One engine runs per Max process. The first <o>sc3~</o> that receives <m>open</m>, <m>eval</m> or <m>bang</m> boots it; others attach and read their own bus range from the same stream, so several objects cost one clock and one socket. An object that never attached stays silent. <m>panic</m>, <m>freeall</m> and the nodes are shared by all attached objects. A mono signal uses one bus: <m>{ SinOsc.ar(440, 0, 0.1) }.play</m> sounds only from outlet 0; use <m>! 2</m> or <m>Pan2</m> for both. There is no Qt, so code that opens a window (<m>plot</m>, <m>Window</m>) fails. A <m>.play</m> started later by a Routine or clock needs an explicit <m>out: ~sc3out</m>, captured when the code is evaluated.
+	</discussion>
+
+	<misc name="Output">
+		<entry name="signal">
+			<description>
+				SuperCollider buses <i>bus</i> to <i>bus</i>+n-1, one per outlet.
+			</description>
+		</entry>
+		<entry name="error">
+			<description>
+				Engine failures, from the outlet after the signal outlets.
+			</description>
+		</entry>
+		<entry name="post">
+			<description>
+				SuperCollider post window text, from the rightmost outlet.
+			</description>
+		</entry>
+	</misc>
+</c74object>

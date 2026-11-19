@@ -3,6 +3,8 @@
 ## Verify
 
 - [ ] Run `.github/workflows/build.yml` once on GitHub.
+- [ ] Open the new help patchers in Max: check the tab layout and that the `attrui` boxes in the `sc_code` tabs reach their attributes. They were generated, not laid out in Max.
+- [ ] The `snippets` tab assumes the package is at `~/Documents/Max 9/Packages/sc3-tilde`.
 
 ## Fix
 

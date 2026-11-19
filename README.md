@@ -170,7 +170,7 @@ because with `console 0` a slow boot or a failed `close` would look like a dead 
 | `evalfile <path>` | evaluate the contents of a file |
 | `send <object> <args…>` | send a message to an object in the interpreter |
 | `panic`, `stop` | `CmdPeriod.run`: stops nodes, clocks and hooks (audio keeps running) |
-| `hardstop` | panic and silence the DSP chain |
+| `hardstop` | `CmdPeriod.hardRun`: panic, and also clears `TempoClock.default` |
 | `freeall` | `s.freeAll`: nodes only, clocks and Routines keep running |
 | `console 0\|1` | same as `@console` (per instance): `1` = also mirror to Max's console, `0` = outlets only |
 | `debug 0\|1` | enable/disable the eval dump |
@@ -200,12 +200,11 @@ writes a file.
 | `⌃.`, `⌘/` | panic (`⌘.` is Max's own stop and cannot be taken) |
 | `⌘Z` / `⇧⌘Z` | undo / redo |
 | `⌘X` `⌘C` `⌘V` | cut / copy / paste |
-| `⌘S` / `⌘O` | save / open `.scd` |
 | `Tab` | insert the suggestion shown in the bar; at a clean start of an argument it writes the IDE template (`freq: `); with no suggestion it indents |
 | `⇧Tab` | cycle to the next suggestion, or outdent |
 | `Esc` | close the suggestions |
 
-Right-click opens the context menu (undo, clipboard, select all, save/load, panic).
+Right-click opens the context menu: undo, redo, the clipboard, select all, and save/load `.scd`.
 Like the SC IDE, only `( … )` counts as an evaluation region: `{ … }` and `[ … ]` spanning
 several lines are not, so select them or use `⌘⇧Return`.
 
