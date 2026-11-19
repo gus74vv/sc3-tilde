@@ -53,11 +53,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/supercollider
-          key: sc-${{ runner.arch }}-${{ env.SC_TAG }}-${{ hashFiles('Makefile') }}
+          key: sc-${{ runner.arch }}-${{ env.SC_TAG }}-${{ hashFiles('source/scripts/build_sc.sh') }}
 
       - name: Build the pinned SuperCollider statics
         if: steps.sc-cache.outputs.cache-hit != 'true'
-        run: make sc
+        run: make sc SC_TAG="$SC_TAG"
 
       - name: Build and check the externals
         run: make test

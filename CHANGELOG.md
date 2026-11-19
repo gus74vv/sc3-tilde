@@ -20,6 +20,8 @@ Changes in this fork, relative to upstream [gus74vv/sc3-tilde](https://github.co
 
 - `make sc` clones and builds only the SuperCollider static libraries `sc3~` links.
 
+- `.github/workflows/build.yml` is the only workflow: run by hand, it builds, runs `make test`, zips the package and, when run on a tag, creates a release. Its SuperCollider cache is keyed on `SC_TAG` and `source/scripts/build_sc.sh`, the `make sc` recipe, so other `Makefile` edits do not trigger a rebuild. The Max package template's `main.yml` and `package.yml` are removed; they built on Windows, which this macOS-only code cannot.
+
 - `sc3~` outlets follow the MSP convention: audio first, left to right `ch 0 … ch n-1`, then `error`, then `post` (rightmost). The audio outlets used to be rightmost. Patches saved with the old layout reconnect by outlet index, so their audio cables now land on the wrong outlets; the bundled help and example patches are rewired. `sc3~.maxhelp` also had its two `dac~` cables crossed, which swapped left and right; they are straightened.
 
 ### Fixed

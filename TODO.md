@@ -2,14 +2,10 @@
 
 ## Verify
 
-- [ ] Boot `sc3~` in Max. `info` should show `classLibrary=` and `ugens=` inside `externals/sc3~.mxo/Contents/Resources`.
-- [ ] Boot with `/Applications/Studio/supercollider/SuperCollider.app` renamed, to prove the bundle needs no installation.
-- [ ] Check `Platform.resourceDir` and `ExampleFiles` resolve to the bundled `sounds/`.
 - [ ] Run `.github/workflows/build.yml` once on GitHub.
 
 ## Fix
 
-- [ ] Delete `.github/workflows/main.yml` and `package.yml`: template workflows with a Windows matrix that cannot build this code.
 - [ ] `package-info.json` lists `x64`, which Max requires but this package does not ship.
 - [ ] `sc_code` writes its index to `externals/sc_code-index.txt`, inside build output. Consider `~/Documents/Max 9/Library` as the default.
 - [ ] Bundled resources are copied in a POST_BUILD step, so they refresh only on relink. Editing files inside `SC_APP` in place does not update the bundle.

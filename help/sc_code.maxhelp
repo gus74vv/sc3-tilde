@@ -176,9 +176,9 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 19.0, 81.0, 432.0, 376.0 ],
-                                    "sc_code_caret": 44,
+                                    "sc_code_caret": 155,
                                     "sc_code_scroll": 0,
-                                    "sc_code_text": "{ [SinOsc.ar(440, 0, 0.1), DC.ar(0)] }.play;",
+                                    "sc_code_text": "// mono out only\n{ [SinOsc.ar(440, 0, 0.1), DC.ar(0)] }.play;\n\n// panned slowly left to right\n{ Pan2.ar(SinOsc.ar(440, 0, 0.1), SinOsc.kr(0.2)) }.play;  \n\n",
                                     "snippets": ""
                                 }
                             },
@@ -320,11 +320,11 @@
                                     "fontname": "Menlo",
                                     "fontsize": 11.0,
                                     "id": "obj-16",
-                                    "linecount": 14,
+                                    "linecount": 13,
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 17.0, 22.0, 459.0, 186.0 ],
+                                    "patching_rect": [ 17.0, 22.0, 465.0, 173.0 ],
                                     "text": "BAR: @callaid 1 (default) reserves the bottom line for the call under the caret: signature, current argument in @barhighlight, n/N on the right, @barcolor. The data is the class library index: send `index` once, sclang writes ~/Documents/Max 9/Library/sc_code-index.txt (one file for every sc_code, @indexfile overrides the path); send it again after installing Quarks or updating SC.\nCOMPLETION: automatic and display-only — at three letters the bar shows the best candidate; ⇥ inserts it (one undo step), ⇧⇥ cycles, Esc closes, typing filters, ⏎ is never taken (it still evaluates / breaks the line). After `Class.` the list holds only the methods of that class. ⌃Space opens it with no prefix, but macOS or Max usually eats that key. ⇥ at a clean argument start writes the IDE template: SinOsc.ar( + ⇥ ⇒ `freq: `."
                                 }
                             }

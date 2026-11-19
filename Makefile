@@ -14,7 +14,6 @@ SC_APP ?= $(firstword $(wildcard /Applications/Studio/supercollider/SuperCollide
 MAX_APP ?= $(firstword $(wildcard /Applications/Studio/Max.app) /Applications/Max.app)
 SC_TAG := Version-3.14.1
 SC_DIR := $(ROOTDIR)/vendor/supercollider
-NPROC := $(shell sysctl -n hw.ncpu)
 
 define section
 	@echo "== $(1)"
@@ -51,15 +50,7 @@ sc: $(SC_DIR)/build/lang/libsclang.a
 
 $(SC_DIR)/build/lang/libsclang.a:
 	$(call section,"building SuperCollider $(SC_TAG) statics")
-	@test -d "$(SC_DIR)" || git clone --branch $(SC_TAG) --depth 1 \
-		--recurse-submodules --shallow-submodules \
-		https://github.com/supercollider/supercollider.git "$(SC_DIR)"
-	@cmake -S "$(SC_DIR)" -B "$(SC_DIR)/build" \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-		-DSC_QT=OFF -DSC_IDE=OFF -DSC_ABLETON_LINK=OFF -DSUPERNOVA=OFF \
-		-DENABLE_TESTSUITE=OFF
-	@cmake --build "$(SC_DIR)/build" -j$(NPROC) --target libsclang libscsynth
+	@$(SRCDIR)/scripts/build_sc.sh "$(SC_TAG)" "$(SC_DIR)"
 
 link:
 	$(call section,"symlink to Max 'Packages' Directories")
