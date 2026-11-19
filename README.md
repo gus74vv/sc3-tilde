@@ -1,6 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 # sc3~ — Supercollider inside Max
 
+A fork of [gus74vv/sc3-tilde](https://github.com/gus74vv/sc3-tilde), restructured as a
+self-contained Max package. See [CHANGELOG.md](CHANGELOG.md) for what changed.
+
 Two Max externals that bring the SuperCollider engine and an SC-style code editor into a
 Max patch, with no external process, no IPC and no SuperCollider GUI:
 
@@ -46,12 +49,21 @@ at boot with a real error instead of leaving a silent engine.
 
 ## Install
 
-1. Copy the package folder (`sc3-tilde`, with `externals/`, `help/` and `examples/`) into
+1. Copy the package folder (`sc3-tilde`, with `externals/`, `help/`, `docs/` and `examples/`) into
    `~/Documents/Max 9/Packages`. From a source checkout, `make link` symlinks it there.
 2. **Restart Max** (`.mxo` files are loaded when the app starts).
 
-For a shorter and more practical overview than the help patches, open
-`examples/example.maxpat`.
+## Documentation
+
+* **Help patchers.** Open one from an object's context menu. `sc3~` has tabs `basic`,
+  `buses`, `control`, `input` and `stopping`; `sc_code` has `basic`, `themes`,
+  `call aid`, `snippets` and `files`. Each tab has an editor with code to evaluate.
+* **Reference pages.** `docs/sc3~.maxref.xml` and `docs/sc_code.maxref.xml` list every
+  message, attribute, argument, inlet and outlet. Max shows them in its reference window.
+* **Example patch.** `examples/example.maxpat` is a shorter, practical overview.
+
+The upstream help files are kept as `help/sc3~-legacy.maxhelp` and
+`help/sc_code-legacy.maxhelp`.
 
 Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 [Gatekeeper](#macos-gatekeeper).
@@ -62,7 +74,7 @@ Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 [sc3~ 2]  ──────────────►  [dac~]
 ```
 * Send `open` (or a `bang`) to boot the engine.
-* Send it code: `eval { SinOsc.ar(440) * 0.2 }.play;` — or patch an `sc_code` editor
+* Send it code: `eval { SinOsc.ar(440) * 0.2 ! 2 }.play;` — or patch an `sc_code` editor
   to the message inlet and press `⌘Return`.
 * Whatever the engine prints shows up in **Max's console** on its own — no outlets, no
   `[print]` needed.
@@ -132,8 +144,11 @@ bus by default.
 
 ### Inlets and outlets
 
-* **Inlet 1 — messages.** Call a signal inlet *after* the message inlet; see `@ins`.
-* **Inlets 2 … N+1 — audio input** (only with `@ins N`). `SoundIn.ar(i)` reads inlet `i`.
+Inlets, left to right:
+
+* **Inlet 1 — messages.** It must stay leftmost; the signal inlets sit to its right.
+* **Inlets 2 … N+1 — audio input** (only with `@ins N`). `SoundIn.ar(i)` reads inlet `i+2`.
+
 Outlets, left to right:
 
 * **Outlets 1 … n — audio**: channel `0` … channel `n-1` (bus `bus` … `bus+n-1`).
@@ -165,15 +180,15 @@ because with `console 0` a slow boot or a failed `close` would look like a dead 
 | `open` | boot the engine (asynchronous; `info` reports the state) |
 | `bang` | boot it if it is not up yet (or if the last boot failed), then post the state |
 | `close` | shut the engine down |
-| `info` | post the current state (version, port, sr, channels, nodes) |
+| `info` | post the current state (version, port, sr, channels, buses, class library and plugin paths) |
 | `eval <code…>` | evaluate an expression (`( … )` for several statements) |
 | `evalfile <path>` | evaluate the contents of a file |
-| `send <object> <args…>` | send a message to an object in the interpreter |
+| `send <object> <args…>` | evaluate the atoms as code, no quoting: `send s.freeAll` |
 | `panic`, `stop` | `CmdPeriod.run`: stops nodes, clocks and hooks (audio keeps running) |
 | `hardstop` | `CmdPeriod.hardRun`: panic, and also clears `TempoClock.default` |
 | `freeall` | `s.freeAll`: nodes only, clocks and Routines keep running |
 | `console 0\|1` | same as `@console` (per instance): `1` = also mirror to Max's console, `0` = outlets only |
-| `debug 0\|1` | enable/disable the eval dump |
+| `debug 0\|1` | write each eval to `/tmp/sc3_eval_last.scd` before it runs |
 | `port <n>` | same as `@port` |
 
 ### Audio input
@@ -383,6 +398,6 @@ published with every release.
 
 ## Support
 
-A little coffee goes a long way.
+Support the original author: a little coffee goes a long way.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T0W629WR81)

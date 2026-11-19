@@ -6,7 +6,7 @@ Changes in this fork, relative to upstream [gus74vv/sc3-tilde](https://github.co
 
 ### Changed
 
-- Restructured as a Max package: `externals/`, `help/`, `examples/` and `package-info.json` at the root. `make link` symlinks the checkout into `~/Documents/Max 9/Packages`.
+- Restructured as a Max package: `externals/`, `help/`, `docs/`, `examples/` and `package-info.json` at the root. `make link` symlinks the checkout into `~/Documents/Max 9/Packages`.
 
 - CMake on top of the `source/max-sdk-base` submodule replaces the per-external Makefiles, `sc.mk` and `build.sh`. Sources live in `source/projects/sc3_tilde` and `source/projects/sc_code`; bundle versions are read from the `#define`s in the sources.
 
@@ -28,9 +28,13 @@ Changes in this fork, relative to upstream [gus74vv/sc3-tilde](https://github.co
 
 - New tabbed help patchers. `sc3~.maxhelp`: basic, buses (two objects on one engine), control (`set`, `send`, text outlets), input (`@ins`), stopping (`freeall`, `panic`, `hardstop`). `sc_code.maxhelp`: basic, themes, call aid, snippets, files. Each tab has a preloaded editor; every code unit compiles in sclang 3.14.1. The previous help files are kept as `sc3~-legacy.maxhelp` and `sc_code-legacy.maxhelp`.
 
+- The README states it is a fork, gains a Documentation section for the help patchers, reference pages and example patch, and describes the bundled runtime instead of an installed SuperCollider.
+
 ### Fixed
 
-- The README listed Cmd+S and Cmd+O for `sc_code`, which binds neither, and a panic item in its context menu, which has none. It also described `hardstop` as silencing the DSP chain; it runs `CmdPeriod.hardRun` and audio keeps running.
+- The channel labels of `sc3~` were reversed. MSP orders `outs[]` by visual outlet position, so the leftmost audio outlet carries channel 0 (bus `bus`), but the assist strings, the README and a code comment named it channel n-1. Confirmed in Max with a signal on channel 0 only.
+
+- The README listed Cmd+S and Cmd+O for `sc_code`, which binds neither, and a panic item in its context menu, which has none. It also described `hardstop` as silencing the DSP chain; it runs `CmdPeriod.hardRun` and audio keeps running. Its inlet numbering put `SoundIn.ar(i)` on inlet `i`; it is inlet `i+2`.
 
 - The SuperCollider statics were built for the host macOS (26.0) while `sc3~` targets 11.0. `make sc` pins arm64 and macOS 11.0.
 
