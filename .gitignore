@@ -1,3 +1,24 @@
+build/
+build-*/
+externals/
+extensions
+support
+sysbuild
+tests
+tmp
+
+__*
+*.sdf
+*.suo
+*.sln
+*.opensdf
+log.txt
+*.o
+*.dylib
+.DS_Store
+.vs
+compile-commands.json
+
 # macOS
 .DS_Store
 
