@@ -53,5 +53,5 @@ set(SC_CODE_MXO "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sc_code.mxo")
 add_test(NAME sc_code_bundle
     COMMAND "${PACKAGE_SCRIPTS}/check_bundle.sh" "${SC_CODE_MXO}" ${CMAKE_OSX_ARCHITECTURES})
 add_test(NAME sc_code_symbols
-    COMMAND python3 "${PACKAGE_SCRIPTS}/check_flat_symbols.py" "${SC_CODE_MXO}")
+    COMMAND python3 "${PACKAGE_SCRIPTS}/check_flat_symbols.py" "${SC_CODE_MXO}" --max "${MAX_APP}")
 set_tests_properties(sc_code_symbols PROPERTIES SKIP_RETURN_CODE 77)

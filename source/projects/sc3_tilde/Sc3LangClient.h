@@ -196,8 +196,8 @@ public:
 private:
     // Excludes EVERYTHING coming from the user (includePaths from
     // sclang_conf.yaml, UserExtension, SystemExtension) and leaves only the stock
-    // class library (which includes SCMaxCompat, because the `make compat` fixture
-    // copies it inside). The paths are the config vector's: removeIncludedDirectory
+    // class library plus mKeepPaths (SCMaxCompat). The paths are the config
+    // vector's: removeIncludedDirectory
     // and addExcludedDirectory are exact-match, enough here
     // (forEachIncludedDirectory checks top-level dirs; pathIsExcluded applies
     // file by file).

@@ -6,10 +6,12 @@ PKG_NAME = sc3-tilde
 MAX_VERSIONS := 8 9
 
 # SuperCollider statics that sc3~ links (see source/projects/sc3_tilde/CMakeLists.txt).
-# SuperCollider.app for the build and the engine's runtime default: the local install if
+# SuperCollider.app whose runtime files are bundled into sc3~.mxo: the local install if
 # present, else the standard location (CI). `make SC_APP=<path>` overrides it.
 SC_APP ?= $(firstword $(wildcard /Applications/Studio/supercollider/SuperCollider.app) \
                       /Applications/SuperCollider.app)
+# Max.app for the symbol checks in `make test`; same lookup.
+MAX_APP ?= $(firstword $(wildcard /Applications/Studio/Max.app) /Applications/Max.app)
 SC_TAG := Version-3.14.1
 SC_DIR := $(ROOTDIR)/vendor/supercollider
 NPROC := $(shell sysctl -n hw.ncpu)
@@ -24,7 +26,7 @@ all: build
 
 build:
 	@mkdir -p build && cd build && \
-		cmake .. $(if $(SC_APP),-DSC_APP="$(SC_APP)") && \
+		cmake .. -DSC_APP="$(SC_APP)" -DMAX_APP="$(MAX_APP)" && \
 		cmake --build . --config Release
 
 test: build

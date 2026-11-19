@@ -1091,8 +1091,10 @@ struct Sc3Engine::Impl {
 				              "interpreter does not have";
 			}
 		} else if (!langBooted) {
-			st.scVersion = installedScVersion(app);
-			// 3.4: with an explicit classLibraryDir (fixture, bundle) it has
+			// No app given: the library is the one bundled with this engine.
+			st.scVersion = cfg.scAppPath.empty() ? std::string(SC_VersionString())
+			                                     : installedScVersion(app);
+			// 3.4: with an explicit classLibraryDir (the bundled one) it has
 			// to be validated here: otherwise sclang fails with "the library has not
 			// been compiled successfully" and it is not obvious that the path is the
 			// problem.
@@ -1230,7 +1232,7 @@ struct Sc3Engine::Impl {
 
 		std::string ugens = cfg.ugenPluginsPath;
 		if (ugens.empty()) {
-			ugens = app + "/Contents/Resources/plugins";
+			ugens = st.classLibraryDir + "/plugins"; // stock plugins sit next to SCClassLibrary
 			if (!fs::is_directory(ugens))
 				ugens = ""; // no stock: only the user dir
 			const std::string user = userPluginsDir();

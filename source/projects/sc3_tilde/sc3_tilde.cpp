@@ -28,10 +28,9 @@
  * `Out.ar(4, sig)` with
  * `[sc3~ 2 4]`.
  *
- * Assets: the class library and the stock UGens come from the REAL
- * SuperCollider installation (/Applications/SuperCollider.app, same version as
- * the engine); only the Qt-less module ships inside the bundle
- * (`Contents/Resources/SCMaxCompat`).
+ * Assets: the class library, the stock UGens and the Qt-less module ship inside
+ * the bundle (`Contents/Resources`), so no SuperCollider installation is needed.
+ * Env SC3_APP_PATH selects an installed SuperCollider.app instead.
  *
  * Project rules (see the design notes): the sclang VM is never touched from the audio
  * thread; the World is only touched from `perform64` (and from the worker
@@ -345,7 +344,8 @@ static std::string sc3_atoms_to_text(long argc, t_atom *argv)
 }
 
 /* `Contents/Resources` of the .mxo, resolved from the binary's path (the bundle
-   is at .../sc3~.mxo/Contents/MacOS/sc3~). SCMaxCompat lives there. */
+   is at .../sc3~.mxo/Contents/MacOS/sc3~). The class library, plugins and
+   SCMaxCompat live there. */
 static std::string sc3_bundle_resources()
 {
 	Dl_info info {};
@@ -358,15 +358,15 @@ static std::string sc3_bundle_resources()
 
 /* ------------------------------------------------------------------ engine */
 
-/* The build sets it from the CMake cache variable SC_APP; env SC3_APP_PATH wins. */
-#ifndef SC3_DEFAULT_APP_PATH
-#define SC3_DEFAULT_APP_PATH "/Applications/SuperCollider.app"
-#endif
-
 static void sc3_engine_config(t_sc3 *x, Sc3EngineConfig &cfg)
 {
-	const char *app = std::getenv("SC3_APP_PATH");
-	cfg.scAppPath = app ? app : SC3_DEFAULT_APP_PATH;
+	/* Default: the bundled class library (and plugins next to it). Env
+	   SC3_APP_PATH uses an installed SuperCollider.app, version-checked. */
+	const std::string res = sc3_bundle_resources();
+	if (const char *app = std::getenv("SC3_APP_PATH"))
+		cfg.scAppPath = app;
+	else
+		cfg.classLibraryDir = res;
 	/* 4.x: World UDP port. Precedence: `@port N` from the patch → env
 	   SC3_PORT (tests/CLI) → **0 = AUTO** (the kernel picks a free one, so the
 	   SC IDE — which always takes 57110 — and sc3~ coexist). The real port shows
@@ -377,9 +377,8 @@ static void sc3_engine_config(t_sc3 *x, Sc3EngineConfig &cfg)
 		wantPort = port ? std::atoll(port) : 0;
 	}
 	cfg.port = (int)std::max<long>(0, std::min<long>(wantPort, 65535));
-	cfg.compatDir = sc3_bundle_resources();
-	if (!cfg.compatDir.empty())
-		cfg.compatDir += "/SCMaxCompat";
+	if (!res.empty())
+		cfg.compatDir = res + "/SCMaxCompat";
 	/* 3.2: the World has to be born at the DSP chain's sample rate. With DSP off
 	   `dsp64` has not run yet (x->sr == 0), but Max already has the driver's
 	   sample rate configured: `sys_getsr()` returns it anyway. That way the normal

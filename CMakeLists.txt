@@ -22,6 +22,8 @@ if (EXPORT_COMPILE_COMMANDS)
 endif ()
 
 set(PACKAGE_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/source/scripts")
+# The *_symbols tests check the bundles against this Max's exports; they skip without it.
+set(MAX_APP "/Applications/Max.app" CACHE PATH "Max.app for the symbol checks")
 enable_testing()
 
 add_subdirectory(source/projects/sc_code)

@@ -23,10 +23,9 @@ jobs:
         with:
           submodules: recursive
 
-      # The engine compiles the *installed* class library and loads the installed
-      # .scx plugins; the bundle also ships libsndfile from SuperCollider.app.
-      # The 3.14.1 release publishes a universal .dmg for macOS (no .zip).
-      - name: Install SuperCollider 3.14.1 (runtime dependency)
+      # The build copies the class library, plugins, sounds and libsndfile from
+      # SuperCollider.app into sc3~.mxo. The 3.14.1 release publishes a universal .dmg.
+      - name: Install SuperCollider 3.14.1 (bundled into sc3~)
         # Authenticated: unauthenticated API calls share 60/hour per runner IP, and a
         # rate-limited answer has no "assets" key.
         env:

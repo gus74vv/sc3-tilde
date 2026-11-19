@@ -37,13 +37,12 @@ struct Sc3EngineConfig {
 	// The object exposes it as `@port`.
 	int port = 0;
 
-	// REAL SuperCollider installation (its library is not packaged in the
-	// external): the class library and the stock UGens come from here. The
-	// version must be the same **minor** version (3.14.x) as the compiled sclang
-	// (3.14.1): a patch change is accepted (4.2), a different minor is not.
+	// Where the class library and stock UGens come from. sc3~ sets classLibraryDir
+	// to its bundled Resources. Without it, an installed app is used and must be the
+	// same **minor** version (3.14.x) as the compiled sclang (3.14.1).
 	std::string scAppPath;       // default: /Applications/SuperCollider.app
 	std::string classLibraryDir; // default: <scAppPath>/Contents/Resources
-	std::string ugenPluginsPath; // default: <scAppPath>/Contents/Resources/plugins
+	std::string ugenPluginsPath; // default: <classLibraryDir>/plugins
 	                             //          + ~/Library/Application Support/SuperCollider/Extensions
 
 	// Qt-free module (SCMaxCompat): added as an include dir of the class library.

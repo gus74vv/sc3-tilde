@@ -22,16 +22,25 @@ Max patch, with no external process, no IPC and no SuperCollider GUI:
 * **macOS 11 or newer, Apple Silicon (arm64).** There is no official Intel build; see
   [Building from source](#building-from-source) if you need x86_64.
 * **Max 9** (tested with 9.2).
-* **SuperCollider 3.14.1 installed** at `/Applications/SuperCollider.app` —
-  [supercollider/supercollider](https://github.com/supercollider/supercollider).
 
-The SuperCollider class library and the stock `.scx` plugins are **not** bundled: the
-engine compiles the installed class library and loads the installed UGen plugins, exactly
-like the SC IDE does. That keeps the download small and makes every Quark and plugin of
-your installation available inside Max.
+No SuperCollider installation is needed. `sc3~.mxo` bundles the SuperCollider 3.14.1 class
+library, the scsynth UGen plugins, the example sounds and `libsndfile`
+(`Contents/Resources`, `Contents/Frameworks`). User Quarks and Extensions in
+`~/Library/Application Support/SuperCollider` still load.
 
-Version policy: the same `major.minor` is accepted (3.14.2, 3.14.7 … with a console note);
-another minor version (3.13, 3.15 …) refuses to boot unless you pass `@allowscversion 1`.
+`sc3~.mxo` is 11 MB, arm64 only; `sc_code.mxo` is 320 KB.
+
+| part | size |
+|---|---|
+| `MacOS/sc3~` (Max object + sclang + scsynth) | 2.9 MB |
+| `Resources/SCClassLibrary` | 2.6 MB |
+| `Resources/plugins` (26 scsynth `.scx`) | 2.5 MB |
+| `Frameworks/libsndfile.dylib` | 2.3 MB |
+| `Resources/sounds`, `HID_Support`, `SCMaxCompat` | 0.7 MB |
+
+To use an installed `SuperCollider.app` instead, set the env var `SC3_APP_PATH` to it before
+Max starts. That app must match the engine's `major.minor` (3.14.x, with a console note);
+another minor version refuses to boot unless you pass `@allowscversion 1`.
 Boot also builds a tiny smoke `SynthDef`, so a library that does not actually work fails
 at boot with a real error instead of leaving a silent engine.
 
@@ -99,7 +108,7 @@ including the one-time `index` message.
   renders whatever is missing and the others read those same samples), so two instances
   cost one clock and one socket.
 * **No Qt.** Text, warnings and `post` are captured through the public embedding API
-  (`SC_LanguageClient`). The class library is the installed one; a small Qt-free module is
+  (`SC_LanguageClient`). The class library is the bundled one; a small Qt-free module is
   added to its include path at boot, so `s.boot` / `s.quit` are no-ops, a bare `.play`
   lands on the instance's buses and `Server.default` points at the engine.
 
@@ -144,7 +153,7 @@ because with `console 0` a slow boot or a failed `close` would look like a dead 
 |---|---|---|
 | `@port N` | `0` | UDP port of the engine's World. `0` = automatic (the kernel picks a free one). Saved with the patch, applied on `open`/`close`. |
 | `@ins N` | `0` | number of audio input signal inlets. Fixed at creation: reload the object to change it. |
-| `@allowscversion 1` | `0` | accept an installed SuperCollider with a different minor version. |
+| `@allowscversion 1` | `0` | with `SC3_APP_PATH`: accept an installed SuperCollider with a different minor version. |
 | `@console 0` | `1` | mirror the engine text to Max's console (same state as the `console` message, but saved with the patch). `0` = outlets only. |
 
 ### Messages
@@ -328,7 +337,8 @@ Builds from source on your own machine have no quarantine flag and need nothing 
 
 ## Building from source
 
-Requires Xcode Command Line Tools, CMake 3.19+ and an installed `SuperCollider.app` 3.14.1.
+Requires Xcode Command Line Tools, CMake 3.19+ and a `SuperCollider.app` 3.14.1 to copy the
+runtime files from.
 The Max SDK is the `source/max-sdk-base` submodule.
 
 ```bash
@@ -338,17 +348,17 @@ make test    # bundle checks (ctest)
 ```
 
 `make sc` clones SuperCollider `Version-3.14.1` into `vendor/supercollider` and builds only
-the static libraries `sc3~` links, for arm64 and macOS 11.0. `sc3~` also copies `libsndfile`
-from `SuperCollider.app/Contents/Frameworks` into its bundle. CMake cache variables:
+the static libraries `sc3~` links, for arm64 and macOS 11.0. The `sc3~` build copies the class
+library, plugins, sounds and `libsndfile` from `SC_APP` into its bundle. CMake cache variables:
 
 | variable | default |
 |---|---|
 | `SC_APP` | `/Applications/SuperCollider.app` |
 | `SC_DIR` | `vendor/supercollider` |
+| `MAX_APP` | `/Applications/Max.app` (symbol checks only) |
 | `CMAKE_OSX_ARCHITECTURES` | `arm64` |
 
-`SC_APP` is also the engine's runtime default for the class library and plugins; the env var
-`SC3_APP_PATH` overrides it. The `Makefile` sets `SC_APP` on every build; override with
+`SC_APP` is used at build time only. The `Makefile` sets it on every build; override with
 `make SC_APP=<path>`.
 
 For x86_64, build both SuperCollider and the externals for that slice
@@ -357,8 +367,8 @@ For x86_64, build both SuperCollider and the externals for that slice
 ## Tests
 
 `make test` checks each built bundle: architecture, ad-hoc signature, no dynamic dependency
-outside macOS, Max and the bundle, and (when `/Applications/Max.app` exists) that every
-undefined symbol is exported by Max or the system.
+outside macOS, Max and the bundle, and that every symbol looked up in Max's flat namespace
+is exported by the Max at `MAX_APP`. Without that Max the symbol checks are skipped.
 
 The headless engine and editor suite (156 engine checks, 1157 editor checks, a 9-case
 failure matrix) is **not** part of this tree; it lives with the upstream development
