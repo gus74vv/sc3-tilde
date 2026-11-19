@@ -6,8 +6,8 @@ The project is GPL-3.0-only (see LICENSE): SuperCollider is GPLv3 and the engine
 links its statics, so the bundle is a derived work.
 
 Usage:
-    python3 tools/spdx.py apply     # add the header where it is missing (idempotent)
-    python3 tools/spdx.py check     # exit 1 if any file lacks it (CI gate)
+    python3 source/scripts/spdx.py apply     # add the header where it is missing (idempotent)
+    python3 source/scripts/spdx.py check     # exit 1 if any file lacks it (CI gate)
 
 Placement rules, so the header never breaks a file:
   * C/C++/ObjC (.c .cc .cpp .h .hpp .mm) and .sc  -> `// SPDX-...` as the first line
@@ -17,7 +17,7 @@ Placement rules, so the header never breaks a file:
 
 Not covered on purpose: patcher assets and fixtures (.maxpat, .maxhelp, .scd), which
 are data (Max would reject a stray comment in some of them) and generated/vendored
-trees (build/, vendor/, backup/, Frameworks/).
+trees (build/, vendor/, backup/, Frameworks/, max-sdk-base/, externals/).
 """
 
 import argparse
@@ -29,7 +29,8 @@ SPDX = 'SPDX-License-Identifier: GPL-3.0-only'
 SLASH_EXTS = {'.c', '.cc', '.cpp', '.h', '.hpp', '.mm', '.sc'}
 HASH_EXTS = {'.sh', '.py', '.mk'}
 MAKE_NAMES = {'Makefile', 'makefile', 'GNUmakefile'}
-SKIP_DIRS = {'vendor', 'build', '.git', 'Frameworks', 'backup', 'spike', '__pycache__'}
+SKIP_DIRS = {'vendor', 'build', '.git', 'Frameworks', 'backup', 'spike', '__pycache__',
+             'max-sdk-base', 'externals'}
 
 
 def walk(root):

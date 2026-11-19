@@ -33,6 +33,8 @@ import sys
 # Symbols that do not appear in the .tbd but resolve at runtime:
 #   · _OBJC_CLASS_$_*  → Foundation/AppKit ObjC classes (dyld loads them from the system)
 #   · dyld_stub_binder → dyld injects it into the binary itself
+SKIPPED = 77
+
 ALLOW = (
     re.compile(r'^_OBJC_(CLASS|METACLASS)_\$_'),
     re.compile(r'^dyld_stub_binder$'),
@@ -116,13 +118,14 @@ def main():
         # Without the Max binary there is nothing to compare against: every Max API
         # symbol would look unresolved. Skip the gate instead of failing (the CI has
         # no Max installed); `--require-max` forces the failure where Max does exist.
+        # Exit 77 is ctest's SKIP_RETURN_CODE.
         why = ('no Max found at %s, and this gate needs its export list' % maxapp)
         if '--require-max' in sys.argv:
             print('ERROR: %s' % why, file=sys.stderr)
             return 1
         print('   symbols: SKIPPED (%s; run it on a machine with Max, or pass '
               '--max <path>)' % why, file=sys.stderr)
-        return 0
+        return SKIPPED
     have |= tbd_symbols()
     # dylibs that travel in the bundle (e.g. libsndfile)
     for lib in glob.glob(os.path.join(os.path.dirname(os.path.dirname(img)), 'Frameworks', '*.dylib')):

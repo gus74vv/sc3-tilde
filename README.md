@@ -37,11 +37,12 @@ at boot with a real error instead of leaving a silent engine.
 
 ## Install
 
-1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the
-   **User Library** (`~/Documents/Max 9/Library`) is always in the path.
-2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Library/help`. For a
-   shorter and more practical overview than the help patches, open `examples/example.maxpat`.
-3. **Restart Max** (`.mxo` files are loaded when the app starts).
+1. Copy the package folder (`sc3-tilde`, with `externals/`, `help/` and `examples/`) into
+   `~/Documents/Max 9/Packages`. From a source checkout, `make link` symlinks it there.
+2. **Restart Max** (`.mxo` files are loaded when the app starts).
+
+For a shorter and more practical overview than the help patches, open
+`examples/example.maxpat`.
 
 Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 [Gatekeeper](#macos-gatekeeper).
@@ -227,8 +228,8 @@ once:
 
 * wire the editor's outlet into `sc3~` and send `index` to `sc_code`: sclang dumps every
   class, method and argument name (`index <path>` writes elsewhere, one shot).
-* one file per installation (`~/Documents/Max 9/Library/sc_code-index.txt`) shared by every
-  `sc_code`; `@indexfile <path>` points at a dump kept somewhere else.
+* one file per installation (`externals/sc_code-index.txt`, next to `sc_code.mxo`) shared by
+  every `sc_code`; `@indexfile <path>` points at a dump kept somewhere else.
 * regenerate it after installing Quarks, editing Extensions or updating SuperCollider:
   methods added at runtime are not in the dump.
 * the editor only **reads** the file (`fopen`, re-parsed when `mtime`/`size` change), so the
@@ -320,57 +321,48 @@ message) and try `snip.1` … `snip.4`.
 The release is signed **ad-hoc**, so a freshly downloaded bundle is quarantined:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Documents/Max\ 9/Library/sc3~.mxo
-xattr -dr com.apple.quarantine ~/Documents/Max\ 9/Library/sc_code.mxo
+xattr -dr com.apple.quarantine ~/Documents/Max\ 9/Packages/sc3-tilde
 ```
 
 Builds from source on your own machine have no quarantine flag and need nothing extra.
 
 ## Building from source
 
-Requires Xcode Command Line Tools, CMake and the Max SDK (`max-sdk-base`, expected in
-`~/Documents/Max 9/Packages/max-sdk/source/max-sdk-base`, or set `MAX_SDK`).
+Requires Xcode Command Line Tools, CMake 3.19+ and an installed `SuperCollider.app` 3.14.1.
+The Max SDK is the `source/max-sdk-base` submodule.
 
 ```bash
-# 1. SuperCollider, pinned to the version the engine is compiled against
-git clone --branch Version-3.14.1 --recurse-submodules \
-  https://github.com/supercollider/supercollider.git vendor/supercollider
-cmake -S vendor/supercollider -B vendor/supercollider/build
-cmake --build vendor/supercollider/build -j"$(sysctl -n hw.ncpu)"
-
-# 2. the engine (builds, signs ad-hoc and installs bundle + help)
-cd external && ./build.sh
-
-# 3. the editor
-cd external/sc_code && make bundle install
+make setup   # submodule + pinned SuperCollider statics (vendor/supercollider) + `make link`
+make         # CMake build: externals/sc3~.mxo and externals/sc_code.mxo
+make test    # bundle checks (ctest)
 ```
 
-`build.sh` needs an installed `SuperCollider.app` for `libsndfile` (it is copied from
-`Contents/Frameworks` and given `@loader_path`); override the path with `SC_APP=…`.
-Other knobs: `MAX_SDK`, `SC3_OUTDIR` (install destination), `SC3_ARCH`, `SC3_MINOS`.
+`make sc` clones SuperCollider `Version-3.14.1` into `vendor/supercollider` and builds only
+the static libraries `sc3~` links, for arm64 and macOS 11.0. `sc3~` also copies `libsndfile`
+from `SuperCollider.app/Contents/Frameworks` into its bundle. CMake cache variables:
 
-### x86_64 (Intel)
+| variable | default |
+|---|---|
+| `SC_APP` | `/Applications/SuperCollider.app` |
+| `SC_DIR` | `vendor/supercollider` |
+| `CMAKE_OSX_ARCHITECTURES` | `arm64` |
 
-The scripts default to arm64; they are not tied to it. On an Intel Mac (or to cross-build)
-pass the architecture through and build SuperCollider for the same slice:
+`SC_APP` is also the engine's runtime default for the class library and plugins; the env var
+`SC3_APP_PATH` overrides it. The `Makefile` sets `SC_APP` on every build; override with
+`make SC_APP=<path>`.
 
-```bash
-cmake -S vendor/supercollider -B vendor/supercollider/build -DCMAKE_OSX_ARCHITECTURES=x86_64
-cmake --build vendor/supercollider/build -j"$(sysctl -n hw.ncpu)"
-cd external && SC3_ARCH=x86_64 SC3_MINOS=11.0 ./build.sh
-cd sc_code && SC_CODE_ARCH=x86_64 SC_CODE_MINOS=11.0 make bundle install
-```
-
-Expect differences: this slice is not tested by the project's CI, so treat it as
-"builds and boots" rather than "supported".
+For x86_64, build both SuperCollider and the externals for that slice
+(`-DCMAKE_OSX_ARCHITECTURES=x86_64`). CI does not test it.
 
 ## Tests
 
-The engine and the editor are tested headless (no Max needed): 156 engine checks +
-1157 editor checks + a 9-case failure matrix (broken Quark, throwing `startup.scd`,
-corrupt `.scx`, port mismatch, impossible boot, eval that throws). The suite is **not**
-part of this tree, so there is no `make test` here — it lives with the development
-repository, next to the design notes.
+`make test` checks each built bundle: architecture, ad-hoc signature, no dynamic dependency
+outside macOS, Max and the bundle, and (when `/Applications/Max.app` exists) that every
+undefined symbol is exported by Max or the system.
+
+The headless engine and editor suite (156 engine checks, 1157 editor checks, a 9-case
+failure matrix) is **not** part of this tree; it lives with the upstream development
+repository.
 
 ## License
 

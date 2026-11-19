@@ -358,10 +358,15 @@ static std::string sc3_bundle_resources()
 
 /* ------------------------------------------------------------------ engine */
 
+/* The build sets it from the CMake cache variable SC_APP; env SC3_APP_PATH wins. */
+#ifndef SC3_DEFAULT_APP_PATH
+#define SC3_DEFAULT_APP_PATH "/Applications/SuperCollider.app"
+#endif
+
 static void sc3_engine_config(t_sc3 *x, Sc3EngineConfig &cfg)
 {
 	const char *app = std::getenv("SC3_APP_PATH");
-	cfg.scAppPath = app ? app : "/Applications/SuperCollider.app";
+	cfg.scAppPath = app ? app : SC3_DEFAULT_APP_PATH;
 	/* 4.x: World UDP port. Precedence: `@port N` from the patch → env
 	   SC3_PORT (tests/CLI) → **0 = AUTO** (the kernel picks a free one, so the
 	   SC IDE — which always takes 57110 — and sc3~ coexist). The real port shows

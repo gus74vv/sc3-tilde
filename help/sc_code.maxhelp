@@ -4,7 +4,7 @@
         "appversion": {
             "major": 9,
             "minor": 2,
-            "revision": 0,
+            "revision": 1,
             "architecture": "x64",
             "modernui": 1
         },
@@ -57,7 +57,7 @@
                     "numinlets": 2,
                     "numoutlets": 1,
                     "outlettype": [ "" ],
-                    "patching_rect": [ 76.0, 502.0, 60.0, 22.0 ],
+                    "patching_rect": [ 42.0, 480.0, 60.0, 22.0 ],
                     "text": "open"
                 }
             },
@@ -68,18 +68,17 @@
                     "numinlets": 1,
                     "numoutlets": 4,
                     "outlettype": [ "", "", "signal", "signal" ],
-                    "patching_rect": [ 20.0, 538.0, 200.0, 22.0 ],
+                    "patching_rect": [ 20.0, 509.0, 200.0, 22.0 ],
                     "text": "sc3~"
                 }
             },
             {
                 "box": {
                     "id": "obj-7",
-                    "maxclass": "newobj",
+                    "maxclass": "ezdac~",
                     "numinlets": 2,
                     "numoutlets": 0,
-                    "patching_rect": [ 140.66666666666669, 579.0, 79.33333333333331, 22.0 ],
-                    "text": "dac~"
+                    "patching_rect": [ 140.66666666666669, 545.0, 45.0, 45.0 ]
                 }
             },
             {
@@ -87,11 +86,11 @@
                     "fontname": "Menlo",
                     "fontsize": 11.0,
                     "id": "obj-8",
-                    "linecount": 11,
+                    "linecount": 10,
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 461.5, 79.0, 260.0, 147.0 ],
+                    "patching_rect": [ 461.5, 79.0, 267.0, 135.0 ],
                     "text": "The buffer is saved with the patch (jsave/jload): a reopened patch brings the editor back as it was. The outlet emits eval <code> (ONE symbol, multi-line, no temp file) or panic — connect it to sc3~. ⌘⏎ evaluates the ( … ) region under the caret or, if there is none, the line: multi-line { … } and [ … ] are not regions (as in the IDE) ⇒ select the block or use ⌘⇧⏎."
                 }
             },
@@ -117,7 +116,7 @@
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 740.0, 407.0, 267.0, 96.0 ],
+                    "patching_rect": [ 740.0, 407.0, 619.0, 96.0 ],
                     "text": "THEME: @theme onedark (default; it is a menu in the Inspector) — also catppuccin, dracula, nord, gruvbox, monokai, solarized: the 21 colors below in one step, and a color set by hand wins over it. Messages: theme dracula · themes (the list).\ncolors: @bgcolor @textcolor @selcolor @caretcolor @curlinecolor (band on the line of the caret, alpha 0 turns it off) @titlebar, and per token @keywordcolor @classcolor @builtincolor @primitivecolor @symbolcolor @charcolor @stringcolor @numbercolor @envvarcolor @commentcolor @bracketcolor @operatorcolor — the factory palette is Catppuccin Mocha"
                 }
             },
@@ -143,7 +142,7 @@
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 740.0, 168.0, 267.0, 58.0 ],
+                    "patching_rect": [ 740.0, 168.0, 273.0, 58.0 ],
                     "text": "Right click: Undo/Redo, Cut/Copy/Paste/Delete, Select All, Save to .scd and Load from .scd (Save sets @file to the chosen path)."
                 }
             },
@@ -156,7 +155,7 @@
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 461.5, 302.0, 267.0, 147.0 ],
+                    "patching_rect": [ 461.5, 302.0, 459.0, 147.0 ],
                     "text": "SNIPPETS: `snippets <path>` (or @snippets, saved with the patch) loads a file of `### key` blocks plus verbatim code, no escapes — the release ships examples/sc_code-snippets.txt. The path can be relative, absolute, start with ~, and keep one pair of quotes (snippets '~/x y.txt' works). With the file loaded, evaluating `snip.key` REPLACES the text with the snippet and does NOT send eval to the engine (nothing is evaluated): the next ⌘⏎ does. It re-reads the file by itself when the mtime or the size changes. Each expansion posts the key that ran to the Max console as `-> kick` (the sclang look, no `sc_code:` prefix): since no eval leaves the box, that is the only confirmation of which snippet was inserted."
                 }
             },
@@ -180,7 +179,7 @@
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 20.0, 211.0, 420.0, 71.0 ],
+                    "patching_rect": [ 20.0, 211.0, 426.0, 71.0 ],
                     "text": "DROP: a file dragged from the Finder onto the box lands as its quoted ABSOLUTE path at the caret (\"/Users/you/Documents/x.wav\"), one undo step, with the patcher locked or unlocked. Absolute on purpose: sclang does not expand ~, so this text goes into SoundFile.openRead as it is."
                 }
             },
@@ -189,11 +188,11 @@
                     "fontname": "Menlo",
                     "fontsize": 11.0,
                     "id": "obj-16",
-                    "linecount": 15,
+                    "linecount": 14,
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 20.0, 292.0, 420.0, 199.0 ],
+                    "patching_rect": [ 20.0, 292.0, 426.0, 186.0 ],
                     "text": "BAR: @callaid 1 (default) reserves the bottom line for the call under the caret: signature, current argument in @barhighlight, n/N on the right, @barcolor. The data is the class library index: send `index` once, sclang writes ~/Documents/Max 9/Library/sc_code-index.txt (one file for every sc_code, @indexfile overrides the path); send it again after installing Quarks or updating SC.\nCOMPLETION: automatic and display-only — at three letters the bar shows the best candidate; ⇥ inserts it (one undo step), ⇧⇥ cycles, Esc closes, typing filters, ⏎ is never taken (it still evaluates / breaks the line). After `Class.` the list holds only the methods of that class. ⌃Space opens it with no prefix, but macOS or Max usually eats that key. ⇥ at a clean argument start writes the IDE template: SinOsc.ar( + ⇥ ⇒ `freq: `."
                 }
             }
