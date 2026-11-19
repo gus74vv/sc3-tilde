@@ -16,12 +16,10 @@
  *   `@port N` (4.x): UDP port of the World. Default 0 = AUTO — the kernel picks
  *   a free one and the object's sclang follows it (`9_SC3ServerPort.sc`), so it
  *   coexists with the SC IDE, which always keeps 57110.
- *   OUTLETS (numbered right to left as in Max):
- *       outlet 0      = error          (text)
- *       outlet 1      = post           (text) — SC console
- *       outlet 2..n+1 = audio ch n-1 … ch 0 (signal)
- *   The signal outlets are created first (ch 0 → ch n-1) so that the `outs`
- *   array in `perform64` is [0]=ch0 (bus busoff), [1]=ch1, …
+ *   OUTLETS (left to right, signal outlets first as in MSP):
+ *       outlet 0..n-1 = audio ch 0 … ch n-1 (signal); `outs[ch]` in perform64
+ *       outlet n      = error          (text)
+ *       outlet n+1    = post           (text) — SC console
  *
  * Evaluated code receives `~sc3out` (base bus of THIS instance) and `~sc3n`
  * (channels), both in the topEnvironment: `Out.ar(~sc3out, sig)` or, directly,
@@ -70,8 +68,8 @@ typedef struct _sc3 {
 	long port;           /* 4.x: World UDP port. 0 = auto (the kernel picks it) */
 	long allowscversion; /* 4.2: 1 = accept a SuperCollider install with another minor version */
 	Sc3AudioCursor cur;  /* 3.5: read position in the World stream */
-	void *out_post;      /* outlet 1 */
-	void *out_err;       /* outlet 0 */
+	void *out_post;      /* outlet n+1 (rightmost) */
+	void *out_err;       /* outlet n */
 	double sr;           /* DSP chain sample rate, refreshed in dsp64 */
 	double sr_warned;    /* 3.2: last sample rate reported as differing from the World */
 	long maxvec;         /* DSP chain maxvectorsize */
@@ -903,16 +901,15 @@ static void sc3_assist(t_sc3 *x, void *b, long m, long a, char *s)
 			         "panic (Cmd+.), hardstop, freeall, console 0|1, debug 0|1, "
 			         "port <n>, bang; @ins N (signal inlets), @port N (0 = auto)");
 	} else {
-		// 3.5: error = 0, post = 1, audio ch n-1 = 2 … ch 0 = n+1.
+		// audio ch 0 … ch n-1 = 0 … n-1, error = n, post = n+1.
 		const long n = x->nchan;
-		if (a == 0)
+		if (a >= 0 && a < n)
+			snprintf(s, 256, "audio ch%ld (signal, bus %ld)", a, x->busoff + a);
+		else if (a == n)
 			snprintf(s, 256, "error (text)");
-		else if (a == 1)
+		else if (a == n + 1)
 			snprintf(s, 256, "post / SC console (text)");
-		else if (a >= 2 && a <= n + 1) {
-			const long ch = n + 1 - a;
-			snprintf(s, 256, "audio ch%ld (signal, bus %ld)", ch, x->busoff + ch);
-		} else
+		else
 			snprintf(s, 256, "outlet %ld", a);
 	}
 }
@@ -1398,12 +1395,13 @@ static void *sc3_new(t_symbol *s, long argc, t_atom *argv)
 	}
 	x->created = 1;
 
-	/* Creation order = left→right; the last one created is outlet 0.
-	   ⇒ error = 0, post = 1, audio ch n-1 = 2 … ch 0 = n+1. */
-	for (long ch = 0; ch < x->nchan; ++ch)
-		outlet_new(x, "signal");
+	/* Each outlet_new() goes to the left of the existing ones, so the text outlets
+	   come first and end up rightmost. perform64's `outs` follow the signal
+	   outlets left to right: outs[0] = ch 0 = bus busoff. */
 	x->out_post = outlet_new(x, NULL);
 	x->out_err  = outlet_new(x, NULL);
+	for (long ch = 0; ch < x->nchan; ++ch)
+		outlet_new(x, "signal");
 
 	x->sr = 0.0;
 	x->maxvec = 0;

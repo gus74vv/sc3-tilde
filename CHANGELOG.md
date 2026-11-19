@@ -20,6 +20,8 @@ Changes in this fork, relative to upstream [gus74vv/sc3-tilde](https://github.co
 
 - `make sc` clones and builds only the SuperCollider static libraries `sc3~` links.
 
+- `sc3~` outlets follow the MSP convention: audio first, left to right `ch 0 … ch n-1`, then `error`, then `post` (rightmost). The audio outlets used to be rightmost. Patches saved with the old layout reconnect by outlet index, so their audio cables now land on the wrong outlets; the bundled help and example patches are rewired. `sc3~.maxhelp` also had its two `dac~` cables crossed, which swapped left and right; they are straightened.
+
 ### Fixed
 
 - The SuperCollider statics were built for the host macOS (26.0) while `sc3~` targets 11.0. `make sc` pins arm64 and macOS 11.0.

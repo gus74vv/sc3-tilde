@@ -134,11 +134,13 @@ bus by default.
 
 * **Inlet 1 — messages.** Call a signal inlet *after* the message inlet; see `@ins`.
 * **Inlets 2 … N+1 — audio input** (only with `@ins N`). `SoundIn.ar(i)` reads inlet `i`.
-* **Outlet 1 — `error`** (red): engine failures.
-* **Outlet 2 — `post`**: the SC console (polls, warnings, `post` output).
-* **Outlets 3 … n+2 — audio**: channel `n-1` … channel `0`.
+Outlets, left to right:
 
-Outlets 1 and 2 are **optional**. By default the same text is mirrored to **Max's
+* **Outlets 1 … n — audio**: channel `0` … channel `n-1` (bus `bus` … `bus+n-1`).
+* **Outlet n+1 — `error`** (red): engine failures.
+* **Outlet n+2 — `post`**: the SC console (polls, warnings, `post` output).
+
+The two text outlets are **optional**. By default the same text is mirrored to **Max's
 console** with the SC IDE's look (raw lines, no object prefix), so a lone `[sc3~]` shows
 its `post` output, warnings and errors with nothing patched. Wire `[print]` to them only
 if you want to route the text yourself, and set `console 0` first so each line is

@@ -4,6 +4,7 @@
 
 - [ ] Boot `sc3~` in Max. `info` should show `classLibrary=` and `ugens=` inside `externals/sc3~.mxo/Contents/Resources`.
 - [ ] Boot with `/Applications/Studio/supercollider/SuperCollider.app` renamed, to prove the bundle needs no installation.
+- [ ] Check the `sc3~` channel order: `{ [SinOsc.ar(440, 0, 0.1), DC.ar(0)] }.play` must sound only from the leftmost outlet. If it comes from the second, `outs[]` follows creation order: index `outs[n-1-ch]` in perform64.
 - [ ] Check `Platform.resourceDir` and `ExampleFiles` resolve to the bundled `sounds/`.
 - [ ] Run `.github/workflows/build.yml` once on GitHub.
 
