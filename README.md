@@ -4,7 +4,7 @@
 SuperCollider engine inside Max. Same process. Audio on Max's buses.
 Editor included: sc_code.
 
-macOS Apple Silicon · Max 9 · SuperCollider 3.14.1.
+Reqs: macOS Apple Silicon · Max 9 · [SuperCollider 3.14.1](https://github.com/supercollider/supercollider).
 The external compiles your installed class library, so your Quarks
 and extensions work as-is.
 No Qt in the engine: plot, Window and the rest of the GUI don't work.
@@ -24,4 +24,8 @@ or send `panic`.
 
 examples/example.maxpat is the tour. Help files are the manual.
 
-GPL-3.0 · https://ko-fi.com/T0W629WR81
+GPL-3.0.
+
+Coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T0W629WR81)
