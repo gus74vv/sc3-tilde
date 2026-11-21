@@ -1,47 +1,33 @@
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Compile-only CI: this tree does not ship the test suite (see README), so the job
-# proves that a clean clone can build both bundles on Apple Silicon and that the
-# results are sane: arm64 slice, ad-hoc signature, and no dynamic dependency outside
-# Apple's system paths, @loader_path and @executable_path.
+# Builds both externals on Apple Silicon, runs the bundle checks (`make test`) and
+# uploads the Max package. The headless engine/editor suite is not in this tree.
 name: build
 
 on:
-  push:
-    branches: [main]
-    # A docs-only push cannot break the build (these files never reach the compiler), and
-    # a release is not built here: skip the run instead of spending a runner on it.
-    # A push that touches the workflow itself still triggers a run, which is the point.
-    paths-ignore:
-      - 'README.md'
-      - 'LICENSE'
-      - 'examples/**'
-  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
     # macos-15 (arm64): macos-14 images are being retired (brownouts cancel the job).
     runs-on: macos-15
+    permissions:
+      contents: write # the Release step on tags
     env:
       SC_TAG: Version-3.14.1
-      SC_COMMIT: 426edf6
-      MAXSDK: ${{ github.workspace }}/max-sdk/source/max-sdk-base
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      # The engine compiles the *installed* class library and loads the installed
-      # .scx plugins; it also takes libsndfile from SuperCollider.app/Frameworks.
-      # The 3.14.1 release publishes a universal .dmg for macOS (no .zip), so the
-      # app is mounted and copied out of it.
-      - name: Install SuperCollider 3.14.1 (runtime dependency)
-        # The release lookup is AUTHENTICATED: unauthenticated API calls share 60/hour
-        # per runner IP, and when that limit is hit the answer is a JSON *message*
-        # instead of the release, so the lookup used to die with an unreadable
-        # KeyError: 'assets' (rerun of 02-nov failed twice on exactly that).
+      # The build copies the class library, plugins, sounds and libsndfile from
+      # SuperCollider.app into sc3~.mxo. The 3.14.1 release publishes a universal .dmg.
+      - name: Install SuperCollider 3.14.1 (bundled into sc3~)
+        # Authenticated: unauthenticated API calls share 60/hour per runner IP, and a
+        # rate-limited answer has no "assets" key.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -54,85 +40,44 @@ jobs:
           curl -sSL "$url" -o "$RUNNER_TEMP/sc.dmg"
           mkdir -p "$RUNNER_TEMP/sc"
           hdiutil attach "$RUNNER_TEMP/sc.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/sc"
-          test -d "$RUNNER_TEMP/sc/SuperCollider.app" || { ls -la "$RUNNER_TEMP/sc"; exit 1; }
           sudo ditto "$RUNNER_TEMP/sc/SuperCollider.app" /Applications/SuperCollider.app
           hdiutil detach "$RUNNER_TEMP/sc" -force || true
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/SuperCollider.app/Contents/Info.plist
 
-      # SC's UGen plugins link against a system libsndfile. Without one, its CMake
-      # falls back to platform/mac/lib/scUBlibsndfile.a, which is Intel-only
-      # (i386,ppc,x86_64) -> the arm64 link fails with _sf_readf_float undefined.
-      # Only the statics need it: our own build takes the dylib from SC.app.
+      # SC's configure needs sndfile headers. Without a system libsndfile its CMake
+      # falls back to an Intel-only static, and the arm64 link fails.
       - name: libsndfile for the SC build
         run: brew install libsndfile
 
-      - name: Cache the SuperCollider static libs
+      - name: Cache the SuperCollider sources and statics
         id: sc-cache
         uses: actions/cache@v4
         with:
-          path: vendor/supercollider/build
-          key: sc-statics-${{ runner.arch }}-${{ env.SC_COMMIT }}
-
-      # The cache holds ONLY the build directory, so a cache hit leaves no sources
-      # behind and every `#include <SC_…>` fails (measured: "SC_LanguageClient.h
-      # file not found" on the first cache-hit run). The clone is shallow and takes
-      # seconds; it is the cmake build that is worth caching, so the sources are
-      # always cloned. They land through a temp dir because `git clone` refuses a
-      # non-empty destination (the restored build/ dir).
-      - name: SuperCollider sources (pinned)
-        run: |
-          set -euo pipefail
-          git clone --branch "$SC_TAG" --depth 1 --recurse-submodules --shallow-submodules \
-            https://github.com/supercollider/supercollider.git "$RUNNER_TEMP/sc-src"
-          git -C "$RUNNER_TEMP/sc-src" rev-parse --short HEAD
-          mkdir -p vendor/supercollider
-          rsync -a --delete --exclude 'build/' "$RUNNER_TEMP/sc-src/" vendor/supercollider/
+          path: vendor/supercollider
+          key: sc-${{ runner.arch }}-${{ env.SC_TAG }}-${{ hashFiles('source/scripts/build_sc.sh') }}
 
       - name: Build the pinned SuperCollider statics
         if: steps.sc-cache.outputs.cache-hit != 'true'
+        run: make sc SC_TAG="$SC_TAG"
+
+      - name: Build and check the externals
+        run: make test
+
+      - name: Package
         run: |
           set -euo pipefail
-          cmake -S vendor/supercollider -B vendor/supercollider/build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DSC_QT=OFF -DSC_IDE=OFF -DSC_ABLETON_LINK=OFF -DSUPERNOVA=OFF \
-            -DENABLE_TESTSUITE=OFF
-          cmake --build vendor/supercollider/build -j"$(sysctl -n hw.ncpu)"
+          pkg="${GITHUB_REPOSITORY#*/}"
+          mkdir -p "dist/$pkg"
+          cp -a package-info.json README.md LICENSE licenses externals help docs examples "dist/$pkg/"
+          (cd dist && zip -qry "$pkg-${GITHUB_SHA::7}.zip" "$pkg")
 
-      # Only max-sdk-base is needed (c74support/max-includes + msp-includes). It lives
-      # in its own repo: the public Cycling74/max-sdk no longer carries it as a
-      # submodule, so cloning max-sdk alone leaves $MAXSDK empty.
-      - name: Max SDK
-        run: |
-          set -euo pipefail
-          mkdir -p max-sdk/source
-          git clone --depth 1 https://github.com/Cycling74/max-sdk-base.git \
-            max-sdk/source/max-sdk-base
-          test -d "$MAXSDK/c74support/max-includes" || { echo "unexpected max-sdk layout"; ls -la "$MAXSDK"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: dist/*.zip
 
-      - name: Build sc3~ (bundle + ad-hoc signature + flat-namespace gate)
-        working-directory: external
-        env:
-          SC3_OUTDIR: ${{ github.workspace }}/out
-          MAX_SDK: ${{ github.workspace }}/max-sdk/source/max-sdk-base
-        run: ./build.sh
-
-      - name: Build sc_code
-        working-directory: external/sc_code
-        env:
-          MAX_SDK: ${{ github.workspace }}/max-sdk/source/max-sdk-base
-        run: make bundle
-
-      - name: Verify the bundles
-        run: |
-          set -euo pipefail
-          for bundle in out/sc3~.mxo external/sc_code/build/sc_code.mxo; do
-            bin="$bundle/Contents/MacOS/$(basename "$bundle" .mxo)"
-            echo "== $bin"
-            file "$bin" | grep -q 'arm64' || { echo "not arm64"; file "$bin"; exit 1; }
-            codesign --verify --strict "$bundle"
-            # dynamic deps: Apple system paths and our own @loader_path only
-            bad=$(otool -L "$bin" | tail -n +2 |
-                  grep -v -E '^[[:space:]]*(/usr/lib/|/System/Library/|@loader_path/|@executable_path/)' || true)
-            if [ -n "$bad" ]; then echo "unexpected dependency:"; echo "$bad"; exit 1; fi
-          done
-          ls -la out/sc3~.mxo/Contents external/sc_code/build | head -20
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: dist/*.zip
+          token: ${{ secrets.GITHUB_TOKEN }}

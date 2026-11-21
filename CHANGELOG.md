@@ -1,0 +1,47 @@
+# Changelog
+
+Changes in this fork, relative to upstream [gus74vv/sc3-tilde](https://github.com/gus74vv/sc3-tilde) 0.15.11.
+
+## Unreleased
+
+### Changed
+
+- Restructured as a Max package: `externals/`, `help/`, `docs/`, `examples/` and `package-info.json` at the root. `make link` symlinks the checkout into `~/Documents/Max 9/Packages`.
+
+- CMake on top of the `source/max-sdk-base` submodule replaces the per-external Makefiles, `sc.mk` and `build.sh`. Sources live in `source/projects/sc3_tilde` and `source/projects/sc_code`; bundle versions are read from the `#define`s in the sources.
+
+- `sc3~.mxo` is self-contained. It bundles the SuperCollider 3.14.1 class library, the 26 scsynth plugins, `sounds/`, `HID_Support/` and `libsndfile`, so no SuperCollider installation is needed at runtime. The env var `SC3_APP_PATH` still selects an installed app, with the old version check. Bundling removes the failure where an installed app of another minor version cannot run the engine's class library.
+
+- All native code in `sc3~.mxo` is arm64 only: the plugins and `libsndfile` are thinned with `lipo`. The bundle is 11 MB.
+
+- Both externals link against the SDK's list of Max symbols instead of `-undefined dynamic_lookup`, so a Max API symbol missing from the SDK fails at link time.
+
+- `make test` runs bundle checks through ctest: architecture slices, signatures, dependencies confined to macOS, Max and the bundle, and Max symbol resolution against `MAX_APP` (skipped without it).
+
+- `make sc` clones and builds only the SuperCollider static libraries `sc3~` links.
+
+- `.github/workflows/build.yml` is the only workflow: run by hand, it builds, runs `make test`, zips the package and, when run on a tag, creates a release. Its SuperCollider cache is keyed on `SC_TAG` and `source/scripts/build_sc.sh`, the `make sc` recipe, so other `Makefile` edits do not trigger a rebuild. The Max package template's `main.yml` and `package.yml` are removed; they built on Windows, which this macOS-only code cannot.
+
+- `sc3~` outlets follow the MSP convention: audio first, left to right `ch 0 … ch n-1`, then `error`, then `post` (rightmost). The audio outlets used to be rightmost. Patches saved with the old layout reconnect by outlet index, so their audio cables now land on the wrong outlets; the bundled help and example patches are rewired. `sc3~.maxhelp` also had its two `dac~` cables crossed, which swapped left and right; they are straightened.
+
+- Reference pages `docs/sc3~.maxref.xml` and `docs/sc_code.maxref.xml` document every message, attribute, argument, inlet and outlet registered in the source. Max shows them in the reference window and in the help header.
+
+- New tabbed help patchers. `sc3~.maxhelp`: basic, buses (two objects on one engine), control (`set`, `send`, text outlets), input (`@ins`), stopping (`freeall`, `panic`, `hardstop`). `sc_code.maxhelp`: basic, themes, call aid, snippets, files. Each tab has a preloaded editor; every code unit compiles in sclang 3.14.1. The previous help files are kept as `sc3~-legacy.maxhelp` and `sc_code-legacy.maxhelp`.
+
+- The README states it is a fork, gains a Documentation section for the help patchers, reference pages and example patch, and describes the bundled runtime instead of an installed SuperCollider.
+
+### Fixed
+
+- The channel labels of `sc3~` were reversed. MSP orders `outs[]` by visual outlet position, so the leftmost audio outlet carries channel 0 (bus `bus`), but the assist strings, the README and a code comment named it channel n-1. Confirmed in Max with a signal on channel 0 only.
+
+- The README listed Cmd+S and Cmd+O for `sc_code`, which binds neither, and a panic item in its context menu, which has none. It also described `hardstop` as silencing the DSP chain; it runs `CmdPeriod.hardRun` and audio keeps running. Its inlet numbering put `SoundIn.ar(i)` on inlet `i`; it is inlet `i+2`.
+
+- The SuperCollider statics were built for the host macOS (26.0) while `sc3~` targets 11.0. `make sc` pins arm64 and macOS 11.0.
+
+- Changing a value in an external's `CMakeLists.txt` regenerated `Info.plist` without relinking, so the SDK's post-build `codesign` did not run and the bundle kept a stale seal. Max 9 rejects such a bundle. The `CMakeLists.txt` is now a link dependency.
+
+- `package-info.json` listed the platform as `arm64`. Max expects `x64`/`aarch64` and refused to load the package ("64-bit architecture unsupported").
+
+- `check_flat_symbols.py` reported `_NSPasteboardTypeString` as unresolved: it re-checked library-bound symbols against SDK `.tbd` files and searched only `Versions/A/`, while AppKit's is under `Versions/C/`. It now checks only the symbols dyld looks up in the flat namespace, which are the ones the linker cannot verify.
+
+- The bundled dylib is named `libsndfile.dylib`, not `libsndfile.1.dylib`: four plugins load `@loader_path/../../Frameworks/libsndfile.dylib`, and another name would load a second copy.

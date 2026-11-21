@@ -1,18 +1,23 @@
 # macOS
 .DS_Store
 
+# cache
+.cache
+.*_cache
+
 # build output
 /build/
-/external/build/
-/external/sc_code/build/
-/external/Frameworks/
+/build-*/
+/externals/
 *.mxo
 *.dSYM
 *.o
+*.dylib
 *.wav
+compile_commands.json
 
-# the vendored SuperCollider is a clone with its own history: build it locally
-/vendor/supercollider/
+# the vendored SuperCollider is a clone with its own history: build it locally (`make sc`)
+/vendor/
 
 # python
 __pycache__/

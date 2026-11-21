@@ -227,7 +227,7 @@
                     "maxclass": "newobj",
                     "numinlets": 1,
                     "numoutlets": 4,
-                    "outlettype": [ "", "", "signal", "signal" ],
+                    "outlettype": [ "signal", "signal", "", "" ],
                     "patching_rect": [ 303.0, 839.0, 105.0, 22.0 ],
                     "text": "sc3~ 2 2"
                 }
@@ -460,7 +460,7 @@
                     "maxclass": "newobj",
                     "numinlets": 1,
                     "numoutlets": 4,
-                    "outlettype": [ "", "", "signal", "signal" ],
+                    "outlettype": [ "signal", "signal", "", "" ],
                     "patching_rect": [ 91.0, 532.0, 97.0, 22.0 ],
                     "text": "sc3~"
                 }
@@ -470,13 +470,13 @@
             {
                 "patchline": {
                     "destination": [ "obj-20", 1 ],
-                    "source": [ "obj-1", 3 ]
+                    "source": [ "obj-1", 1 ]
                 }
             },
             {
                 "patchline": {
                     "destination": [ "obj-20", 0 ],
-                    "source": [ "obj-1", 2 ]
+                    "source": [ "obj-1", 0 ]
                 }
             },
             {
@@ -503,13 +503,13 @@
             {
                 "patchline": {
                     "destination": [ "obj-3", 1 ],
-                    "source": [ "obj-2", 3 ]
+                    "source": [ "obj-2", 1 ]
                 }
             },
             {
                 "patchline": {
                     "destination": [ "obj-3", 0 ],
-                    "source": [ "obj-2", 2 ]
+                    "source": [ "obj-2", 0 ]
                 }
             },
             {
