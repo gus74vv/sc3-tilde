@@ -74,9 +74,8 @@ add_library(${PROJECT_NAME} MODULE
 )
 add_dependencies(${PROJECT_NAME} sc3_sndfile)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-    "${MAX_SDK_INCLUDES}"
-    "${MAX_SDK_MSP_INCLUDES}"
+# Shared with the headless test below.
+set(SC_INCLUDES
     "${SC_BUILD_DIR}/common"
     "${SC_DIR}/include/common"
     "${SC_DIR}/include/lang"
@@ -87,16 +86,19 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     "${SC_DIR}/lang/LangSource"
     "${SC_DIR}/external_libraries/nova-tt"
     "${SC_DIR}/external_libraries/TLSF-2.4.6/src")
-target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
+set(SC_SYSTEM_INCLUDES
     "${SC_DIR}/external_libraries/boost"
     "${SC_DIR}/external_libraries/boost_sync/include"
     "${SC_DIR}/external_libraries/yaml-cpp/include")
+set(SC_WARNINGS -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type-mismatch)
 
-target_compile_options(${PROJECT_NAME} PRIVATE
-    -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type-mismatch)
+target_include_directories(${PROJECT_NAME} PRIVATE
+    "${MAX_SDK_INCLUDES}" "${MAX_SDK_MSP_INCLUDES}" ${SC_INCLUDES})
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${SC_SYSTEM_INCLUDES})
+target_compile_options(${PROJECT_NAME} PRIVATE ${SC_WARNINGS})
 
 # Link order matters for the statics.
-target_link_libraries(${PROJECT_NAME} PRIVATE
+set(SC_LIBS
     "${SC_BUILD_DIR}/lang/libsclang.a"
     "${SC_BUILD_DIR}/external_libraries/hidapi/mac/libhidapi.a"
     "${SC_BUILD_DIR}/external_libraries/hidapi/hidapi_parser/libhidapi_parser.a"
@@ -116,6 +118,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     "-framework CoreFoundation"
     "${SNDFILE}"
     "${SC_BUILD_DIR}/external_libraries/libyaml.a")
+target_link_libraries(${PROJECT_NAME} PRIVATE ${SC_LIBS})
 
 # Before max-posttarget.cmake, so its POST_BUILD codesign seals these files too.
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -153,3 +156,19 @@ add_test(NAME sc3_tilde_bundle
 add_test(NAME sc3_tilde_symbols
     COMMAND python3 "${PACKAGE_SCRIPTS}/check_flat_symbols.py" "${SC3_MXO}" --max "${MAX_APP}")
 set_tests_properties(sc3_tilde_symbols PROPERTIES SKIP_RETURN_CODE 77)
+
+# Headless: user Extension + Quark under the bundled library, and the degraded boot.
+# In bin/ so libsndfile's @loader_path/../Frameworks id resolves to the copy built above.
+add_executable(sc3_quarks_test tests/quarks_test.cpp Sc3Engine.cpp)
+add_dependencies(sc3_quarks_test sc3_sndfile ${PROJECT_NAME})
+set_target_properties(sc3_quarks_test PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+target_include_directories(sc3_quarks_test PRIVATE ${SC_INCLUDES})
+target_include_directories(sc3_quarks_test SYSTEM PRIVATE ${SC_SYSTEM_INCLUDES})
+target_compile_features(sc3_quarks_test PRIVATE cxx_std_17)
+target_compile_options(sc3_quarks_test PRIVATE ${SC_WARNINGS})
+target_link_libraries(sc3_quarks_test PRIVATE ${SC_LIBS})
+foreach(_mode ok broken)
+    add_test(NAME sc3_tilde_quarks_${_mode}
+        COMMAND sc3_quarks_test "${SC3_MXO}/Contents/Resources" ${_mode})
+endforeach()
