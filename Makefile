@@ -8,7 +8,7 @@ MAX_VERSIONS := 8 9
 # SuperCollider statics that sc3~ links (see source/projects/sc3_tilde/CMakeLists.txt).
 # SuperCollider.app whose runtime files are bundled into sc3~.mxo: the local install if
 # present, else the standard location (CI). `make SC_APP=<path>` overrides it.
-SC_APP ?= $(firstword $(wildcard /Applications/Studio/supercollider/SuperCollider.app) \
+SC_APP ?= $(firstword $(wildcard /Applications/Studio/supercollider-3.14.1/SuperCollider.app) \
                       /Applications/SuperCollider.app)
 # Max.app for the symbol checks in `make test`; same lookup.
 MAX_APP ?= $(firstword $(wildcard /Applications/Studio/Max.app) /Applications/Max.app)

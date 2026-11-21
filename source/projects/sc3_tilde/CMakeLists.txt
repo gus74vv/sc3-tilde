@@ -134,6 +134,11 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
             "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/HID_Support"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/plugins"
     ${SC_PLUGIN_CMDS}
+    # Notices travel with the bundle. LICENSE sits beside licenses/ so its ../LICENSE link resolves.
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/licenses"
+            "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/licenses"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/LICENSE"
+            "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/LICENSE"
     VERBATIM)
 
 # The plist values above live in this file. Relinking on its change re-runs the

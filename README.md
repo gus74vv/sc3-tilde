@@ -394,7 +394,8 @@ repository.
 
 GPL-3.0-only — see [LICENSE](LICENSE). The engine links SuperCollider's statics
 (`libsclang`, `libscsynth`), which are GPLv3, so this bundle is a derived work. Sources are
-published with every release.
+published with every release. Licenses and sources of the bundled SuperCollider files,
+`libsndfile` and its codecs are listed in [licenses/](licenses/README.md).
 
 ## Support
 
