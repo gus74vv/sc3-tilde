@@ -4,201 +4,2119 @@
         "appversion": {
             "major": 9,
             "minor": 2,
-            "revision": 0,
+            "revision": 1,
             "architecture": "x64",
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 118.0, 112.0, 1222.0, 725.0 ],
+        "rect": [
+            176.0,
+            146.0,
+            734.0,
+            720.0
+        ],
+        "default_fontsize": 13.0,
+        "showrootpatcherontab": 0,
+        "showontab": 0,
         "boxes": [
             {
                 "box": {
-                    "id": "obj-16",
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
-                    "patching_rect": [ 122.0, 48.0, 37.0, 22.0 ],
-                    "text": "panic"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-14",
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
-                    "patching_rect": [ 73.0, 48.0, 37.0, 22.0 ],
-                    "text": "close"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-12",
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
-                    "patching_rect": [ 26.0, 48.0, 35.0, 22.0 ],
-                    "text": "open"
-                }
-            },
-            {
-                "box": {
-                    "fontsize": 12.0,
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
                     "id": "obj-1",
-                    "linecount": 55,
-                    "maxclass": "comment",
-                    "numinlets": 1,
+                    "maxclass": "newobj",
+                    "numinlets": 0,
                     "numoutlets": 0,
-                    "patching_rect": [ 642.0, 18.0, 600.0, 744.0 ],
-                    "text": "sc3~ 0.16.0 — SuperCollider 3.14.1 embedded: sclang + scsynth in-process.\n\nARGUMENTS (ONE World per Max process):\n  [sc3~]          2 channels, buses 0..1        (compatible with older patches)\n  [sc3~ n]        n channels, buses 0..n-1\n  [sc3~ n bus]    n channels, buses bus..bus+n-1\n  n = 1..16 and bus + n <= 64. Out of range: console error, the object stays muted.\n\nSeveral sc3~ SHARE that World (one boot, one clock, one socket) and each one reads\nITS bus range: [sc3~ 2 0] and [sc3~ 2 2] live in the same patch. Each instance has\nto be ATTACHED to the World: `open` does it (with the World already up it does not\nboot again, it joins) and so do `eval`, `set`, `evalfile` and `panic`. An instance\nthat never attached stays silent, even while another one is playing. `close`\ndetaches it; the World only goes down with the LAST owner. panic, s.freeAll and the\nnodes are shared, as in the SC IDE: they hit every instance.\n\nPORT: the World binds a FREE UDP port (0 = auto, the default) and its sclang\nfollows it — `info` prints it, ~s.addr.port. That is why sc3~ and the SuperCollider\nIDE coexist: scide keeps 57110, no clash. @port 57110 forces the classic port and\nthen it does fight the IDE. The port belongs to the World: it is fixed by the first\nsc3~ that boots, and changing @port asks for close + open.\n\nOUTLETS (left to right, which is also the index): 0..n-1 = audio, channel 0\nfirst (the leftmost audio outlet is bus `bus`, the next one bus+1); n = error;\nn+1 = post.\nBREAKING in 0.16 (issue #1 item 10): before, 0 was `error`, 1 was `post` and the\naudio ran from n+1 (channel 0) down to 2. An old patch still plays, but audio\nand text arrive on the wrong outlets until each connection moves to its new\nindex: audio goes LEFT (ch0 = 0), text goes RIGHT (error = n, post = n+1).\nINLETS: 1 = MESSAGES and, with @ins N, N audio inputs to its right\n(2 = SoundIn.ar(0), 3 = SoundIn.ar(1) …, see the input block below). The message\ninlet must be created FIRST: otherwise Max 9 sends every connection to the first\nsignal inlet.\n\nCODE: from [sc_code] (its outlet emits `eval <code>`) or a message box. An eval\ngets ~sc3out (bus base of THAT instance) and ~sc3n (its channels):\nOut.ar(~sc3out, sig).\nA bare Ndef .play and .playN land on this instance's buses (nothing to pass); an\nexplicit out: / outs: wins. A pushed ProxySpace changes nothing:\nProxySpace.push(s.boot); ~out.play; ~out = { ... } sounds on ~sc3out too (the bus\nis read from the interpreter's topEnvironment, so a ProxySpace in front cannot\nturn it into a proxy). INSIDE that space your own ~sc3out is a JITLib variable\nagain: it names a NodeProxy, not the bus, so Out.ar(~sc3out, sig) would be silent.\nThere use ~out.play, topEnvironment.at(\\sc3out), or capture b = ~sc3out BEFORE the\npush. A .play deferred from a Routine or a clock sees the last evaluated bus: pass\nout:.\n\nCHANNELS: the signal decides how many buses it takes. A MONO source uses ONE bus,\nso only the first outlet sounds (SC behaviour, same as a mono into [dac~]). For\nboth: SinOsc.ar(440) ! 2, SinOsc.ar([440, 660]) or .play(numChannels: 2).\n\nBOOT: `open` (or a bang, or the first eval) starts sclang + the World in the\nbackground, ~4 s, without blocking Max; the console goes `booting` → `ready`. The\nclass library and the UGens come from /Applications/SuperCollider.app.\n\nSC VERSION: the MINOR must match the engine's (3.14.x). 3.14.2 or 3.14.7 are\naccepted with a note; 3.13 / 3.15 / 4.x only start with @allowscversion 1 (or\nSC3_ALLOW_SC_VERSION=1) plus a warning. The boot ends with a SynthDef smoke test: if\nthe interpreter cannot build it, the boot fails there with the cause.\n\nThe .mxo does not need Homebrew: its only non-Apple dependency (libsndfile) travels\nin Contents/Frameworks, referenced with @loader_path.\n\nDIAGNOSTICS: `info` gives engine=booting|ready|failed, the cause if it failed,\nsr/blockLen/units, dsp=, console=, queued= and busy= (ms of the eval in flight; 10 s\n= stuck). Its last line, dsp64, is the audio path in one glance: blocks (did the\naudio thread call us), numouts (one per SIGNAL outlet), slots (S = buffer, - =\nNULL) and peak, the loudest sample that left the object. peak > 0 while you hear\nnothing means the audio is leaving sc3~: look downstream (a live.gain~ at -inf, an\nezdac~ switched off, dac~ in the wrong channels). peak = 0 means nothing is being\nproduced: check the eval, the buses and `open`. Anything scsynth prints that is not a failure (a .poll, a synthdef load)\ncomes out of `post` in black; red on `error` is only for *** ERROR, ERROR, FAILURE\nIN SERVER and Exception."
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [
+                            176.0,
+                            172.0,
+                            734.0,
+                            694.0
+                        ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "border": 0,
+                                    "filename": "helpdetails.js",
+                                    "id": "obj-1",
+                                    "ignoreclick": 1,
+                                    "jsarguments": [
+                                        "sc3~",
+                                        90
+                                    ],
+                                    "maxclass": "jsui",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [
+                                        10.0,
+                                        10.0,
+                                        630.0,
+                                        127.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        158.0,
+                                        44.0,
+                                        23.0
+                                    ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        70.0,
+                                        158.0,
+                                        52.0,
+                                        23.0
+                                    ],
+                                    "text": "close"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        125.0,
+                                        158.0,
+                                        44.0,
+                                        23.0
+                                    ],
+                                    "text": "info"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        175.0,
+                                        158.0,
+                                        52.0,
+                                        23.0
+                                    ],
+                                    "text": "panic"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        240.0,
+                                        151.5,
+                                        403.0,
+                                        40.0
+                                    ],
+                                    "text": "open boots sclang + scsynth in the background (about 4 s); the Max console says booting, then ready. info posts the state."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-7",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        203.0,
+                                        620.0,
+                                        250.0
+                                    ],
+                                    "sc_code_caret": 112,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Click in this editor. Put the caret on a line and press Shift+Return.\n{ SinOsc.ar([440, 443], 0, 0.1) }.play;\n\n// Cmd+Return evaluates the ( ... ) block around the caret.\n(\n{\n    var trig = Impulse.kr(4);\n    var freq = TRand.kr(200, 800, trig);\n    var sig = SinOsc.ar(freq) * Decay2.kr(trig, 0.01, 0.25) * 0.2;\n    Pan2.ar(sig, LFNoise1.kr(0.5))\n}.play;\n)\n\n// Stop: Ctrl+. in this editor, or click panic.\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [
+                                        "signal",
+                                        "signal",
+                                        "",
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        473.0,
+                                        62.0,
+                                        23.0
+                                    ],
+                                    "text": "sc3~ 2"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-9",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        95.0,
+                                        473.0,
+                                        345.0,
+                                        90
+                                    ],
+                                    "text": "Outlets: left to right: audio ch 0, audio ch 1, error, post. \nThe text also prints in the Max console.\n0.16 changed this order (before: error, post, ch1, ch0): an old patch still\nplays, but its audio and text land on the wrong outlets until the\nconnections move to the new index."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-10",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        518.0,
+                                        45.0,
+                                        45.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-11",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        75.0,
+                                        528.0,
+                                        150.0,
+                                        21.0
+                                    ],
+                                    "text": "turn audio on"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-12",
+                                    "linecount": 3,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        578.0,
+                                        620.0,
+                                        80
+                                    ],
+                                    "text": "sc3~ runs SuperCollider 3.14.1 inside Max. sc_code sends each evaluation as one eval message. The class library and the UGens come from an installed SuperCollider 3.14.x,\nthe same files the IDE loads. Do not press Cmd+. \nin Max: it stops Max's scheduler. Use panic."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-2",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-3",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-4",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-5",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-7",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        1
+                                    ],
+                                    "source": [
+                                        "obj-8",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-8",
+                                        0
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [
+                        10.0,
+                        140.0,
+                        70.0,
+                        23.0
+                    ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p basic"
                 }
             },
             {
                 "box": {
-                    "fontsize": 11.0,
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
                     "id": "obj-2",
-                    "linecount": 37,
-                    "maxclass": "comment",
-                    "numinlets": 1,
+                    "maxclass": "newobj",
+                    "numinlets": 0,
                     "numoutlets": 0,
-                    "patching_rect": [ 15.0, 324.0, 640.0, 461.0 ],
-                    "text": "MESSAGES\n  open · close · info · bang\n  eval <code>            one line; `send` and `set` skip the escaping below\n  send <target> <args>   SC message, no quotes: send s.freeAll, send CmdPeriod.run\n  set <target> <key> <value> [...]   Synth/Node args, built here:\n                         set x freq 81 amp 0.2  ==>  x.set(\\freq, 81, \\amp, 0.2)\n  evalfile <path>        multi-line code from a file (absolute path)\n  panic / stop           Ctrl+Period equivalent: CmdPeriod.run (nodes, clocks, hooks)\n  hardstop               CmdPeriod.hardRun: also TempoClock.default\n  freeall                nodes only: s.freeAll\n  port <n>               World UDP port (0 = auto); asks for close + open\n  console 0|1            also mirror the engine text to the Max console (default 1)\n  debug 0|1              dump every eval to /tmp/sc3_eval_last.scd\n\n`panic` kills the WHOLE Server, whatever other sc3~ are playing. While an eval does\nnot return, `info` shows busy=<ms>; after 10 s the engine counts as stuck: eval,\nsend, set and evalfile are dropped with an error and `close` is refused — restart Max.\n\nMULTI-INSTANCE: [sc3~ 2 0] and [sc3~ 2 2] in the same patch; eval\nNdef(\\a, { SinOsc.ar(440) * 0.2 }).play in the first and\nNdef(\\b, { Saw.ar(220) * 0.2 }).play in the second ⇒ each one comes out of its own\nchannels (tests/two.maxpat). Evaluating in the second one is enough: it attaches to\nthe running World; `open` does the same, instantly. An Ndef with more channels than\nthe object writes extra buses that object does NOT read.\n\nMULTI-LINE CODE: [textedit] → [prepend eval] → sc3~ (tests/editor.maxpat): the text\ntravels whole, nothing to escape. A message box is a lexer — ',' and ';' separate\nmessages and '\\' is its escape — so eval x.set(\\freq, $1) arrives as\nx.set(freq\\, 81). Use `set` for parameters; for raw text with symbols or commas send\nONE symbol: [textedit] with outputmode 1 (tests/editor.maxpat) or\n[sprintf symout x.set(%cfreq%c %d)] (92 = backslash, 44 = comma) (tests/args.maxpat).\n\nconsole 0|1: 1 = the engine text also goes to the Max console (default, like the IDE\npost window); 0 = only the post/error outlets, for patches with a wired [print]. It\nis per instance and the state lives in @console, saved with the patch, so it never\nmutes another patch. The lifecycle lines (open/close/panic/hardstop) always print:\nwith 0 a slow boot or a failed close would look like a dead object."
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [
+                            0.0,
+                            26.0,
+                            734.0,
+                            694.0
+                        ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "linecount": 3,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        15.0,
+                                        620.0,
+                                        50.0
+                                    ],
+                                    "text": "Each sc3~ serves its own bus range of ONE shared engine: [sc3~ 2 0] plays buses 0-1, [sc3~ 2 2] buses 2-3. ~sc3out is the first bus of the object that evaluated the code, ~sc3n its channel count. A bare .play uses ~sc3out by itself."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        90.0,
+                                        44.0,
+                                        23.0
+                                    ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-3",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        125.0,
+                                        305.0,
+                                        210.0
+                                    ],
+                                    "sc_code_caret": 123,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Evaluated through [sc3~ 2 0]: ~sc3out = 0\n[~sc3out, ~sc3n].postln;\n\na = { SinOsc.ar([220, 221], 0, 0.08) }.play;\na.free;\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-4",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        335.0,
+                                        125.0,
+                                        357.0,
+                                        210.0
+                                    ],
+                                    "sc_code_caret": 211,
+                                    "sc_code_scroll": 26,
+                                    "sc_code_text": "// Evaluated through [sc3~ 2 2]: ~sc3out = 2\n[~sc3out, ~sc3n].postln;\n\n(\nb = {\n    var sig = LFSaw.ar([330, 331]) * 0.05;\n    Out.ar(~sc3out, RLPF.ar(sig, LFNoise1.kr(1).range(400, 2000), 0.3))\n}.play;\n)\nb.free;\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [
+                                        "signal",
+                                        "signal",
+                                        "",
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        355.0,
+                                        78.0,
+                                        23.0
+                                    ],
+                                    "text": "sc3~ 2 0"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [
+                                        "signal",
+                                        "signal",
+                                        "",
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        335.0,
+                                        355.0,
+                                        78.0,
+                                        23.0
+                                    ],
+                                    "text": "sc3~ 2 2"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-7",
+                                    "maxclass": "meter~",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        "float"
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        395.0,
+                                        80.0,
+                                        13.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-8",
+                                    "maxclass": "meter~",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        "float"
+                                    ],
+                                    "patching_rect": [
+                                        110.0,
+                                        395.0,
+                                        80.0,
+                                        13.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-9",
+                                    "maxclass": "meter~",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        "float"
+                                    ],
+                                    "patching_rect": [
+                                        335.0,
+                                        395.0,
+                                        80.0,
+                                        13.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-10",
+                                    "maxclass": "meter~",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        "float"
+                                    ],
+                                    "patching_rect": [
+                                        425.0,
+                                        395.0,
+                                        80.0,
+                                        13.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-11",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        425.0,
+                                        45.0,
+                                        45.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-12",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        74.5,
+                                        78.0,
+                                        378.0,
+                                        40.0
+                                    ],
+                                    "text": "One open boots the engine; the second object attaches to it. \npanic, freeall and the nodes are shared by both."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-13",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        490.0,
+                                        620.0,
+                                        200
+                                    ],
+                                    "text": "A mono signal uses one bus: { SinOsc.ar(440, 0, 0.1) }.play sounds only from the left outlet. Use ! 2, an array, or Pan2 for both channels. Arguments: [sc3~ channels bus], channels 1-16, bus + channels <= 64.\n\nPORT: the engine binds a FREE UDP port (0 = auto), which is why sc3~ and the\nSuperCollider IDE coexist; info prints it, and @port asks for close +\nopen (the port belongs to the engine, not to the object).\n\nProxySpace: inside a pushed space a bare ~sc3out is a JITLib variable again\n(it names a NodeProxy), so Out.ar(~sc3out, sig) there is SILENT: use\n~out.play, topEnvironment.at(\\sc3out), or capture the bus before the push."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-5",
+                                        0
+                                    ],
+                                    "order": 1,
+                                    "source": [
+                                        "obj-2",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-6",
+                                        0
+                                    ],
+                                    "order": 0,
+                                    "source": [
+                                        "obj-2",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-5",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-3",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-6",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-4",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-11",
+                                        1
+                                    ],
+                                    "order": 1,
+                                    "source": [
+                                        "obj-5",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-11",
+                                        0
+                                    ],
+                                    "order": 0,
+                                    "source": [
+                                        "obj-5",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-7",
+                                        0
+                                    ],
+                                    "order": 1,
+                                    "source": [
+                                        "obj-5",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "order": 0,
+                                    "source": [
+                                        "obj-5",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "order": 0,
+                                    "source": [
+                                        "obj-6",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-11",
+                                        1
+                                    ],
+                                    "order": 1,
+                                    "source": [
+                                        "obj-6",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-11",
+                                        0
+                                    ],
+                                    "order": 1,
+                                    "source": [
+                                        "obj-6",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-9",
+                                        0
+                                    ],
+                                    "order": 0,
+                                    "source": [
+                                        "obj-6",
+                                        0
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [
+                        90.0,
+                        140.0,
+                        70.0,
+                        23.0
+                    ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p buses"
                 }
             },
             {
                 "box": {
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
                     "id": "obj-3",
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
-                    "patching_rect": [ 122.0, 126.0, 37.0, 22.0 ],
-                    "text": "info"
+                    "maxclass": "newobj",
+                    "numinlets": 0,
+                    "numoutlets": 0,
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [
+                            0.0,
+                            26.0,
+                            734.0,
+                            694.0
+                        ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        15.0,
+                                        620.0,
+                                        36.0
+                                    ],
+                                    "text": "A message box splits text at commas and eats backslashes, so it cannot carry x.set(\\freq, 300). The set message writes them for you: set x freq 300 evaluates x.set(\\freq, 300);"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        85.0,
+                                        44.0,
+                                        23.0
+                                    ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-3",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        120.0,
+                                        620.0,
+                                        120.0
+                                    ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// 1. open, then evaluate this line (Shift+Return):\nx = { |freq = 220, amp = 0.1| SinOsc.ar(freq.lag(0.05) ! 2, 0, amp.lag(0.05)) }.play;\n\n// 2. Drag the number boxes. 3. Release:\nx.release(1);\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "number",
+                                    "maximum": 2000,
+                                    "minimum": 50,
+                                    "numinlets": 1,
+                                    "numoutlets": 2,
+                                    "outlettype": [
+                                        "",
+                                        "bang"
+                                    ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        260.0,
+                                        60.0,
+                                        23.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "format": 6,
+                                    "id": "obj-5",
+                                    "maxclass": "flonum",
+                                    "maximum": 0.5,
+                                    "minimum": 0.0,
+                                    "numinlets": 1,
+                                    "numoutlets": 2,
+                                    "outlettype": [
+                                        "",
+                                        "bang"
+                                    ],
+                                    "parameter_enable": 0,
+                                    "patching_rect": [
+                                        200.0,
+                                        260.0,
+                                        60.0,
+                                        23.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        295.0,
+                                        158.0,
+                                        23.0
+                                    ],
+                                    "text": "prepend set x freq"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        200.0,
+                                        295.0,
+                                        150.0,
+                                        23.0
+                                    ],
+                                    "text": "prepend set x amp"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        380.0,
+                                        260.0,
+                                        196.0,
+                                        23.0
+                                    ],
+                                    "text": "set x freq 440 amp 0.05"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-9",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        380.0,
+                                        295.0,
+                                        148.0,
+                                        23.0
+                                    ],
+                                    "text": "send x.release(2)"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "bubbleside": 0,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-10",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        380.0,
+                                        325.0,
+                                        316.0,
+                                        40.0
+                                    ],
+                                    "text": "send evaluates its atoms as code, with no quoting."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-11",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        340.0,
+                                        108.0,
+                                        23.0
+                                    ],
+                                    "text": "eval 2 ** 10"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-12",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        140.0,
+                                        337.0,
+                                        220.0,
+                                        25.0
+                                    ],
+                                    "text": "the result prints as post"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-13",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [
+                                        "signal",
+                                        "signal",
+                                        "",
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        395.0,
+                                        62.0,
+                                        23.0
+                                    ],
+                                    "text": "sc3~ 2"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-14",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        520.0,
+                                        45.0,
+                                        45.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-15",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        120.0,
+                                        440.0,
+                                        126.0,
+                                        23.0
+                                    ],
+                                    "text": "print sc-error"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-16",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        250.0,
+                                        440.0,
+                                        118.0,
+                                        23.0
+                                    ],
+                                    "text": "print sc-post"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-17",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        380.0,
+                                        380.0,
+                                        84.0,
+                                        23.0
+                                    ],
+                                    "text": "console 0"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-18",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        470.0,
+                                        380.0,
+                                        84.0,
+                                        23.0
+                                    ],
+                                    "text": "console 1"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "bubbleside": 0,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-19",
+                                    "linecount": 3,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        380.0,
+                                        410.0,
+                                        260.0,
+                                        69.0
+                                    ],
+                                    "text": "console 0: text goes only to the two text outlets (wire [print] there). console 1 (default): also to the Max console."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-20",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        580.0,
+                                        620.0,
+                                        170
+                                    ],
+                                    "text": "evalfile <path> evaluates a whole .scd file. debug 1 writes each eval to /tmp/sc3_eval_last.scd.\n\nDIAGNOSTICS: info posts the state, and its last line (dsp64: blocks numouts\nslots peak) is the audio path at a glance. peak > 0 while you hear\nnothing means the audio IS leaving sc3~: look downstream (live.gain~ at\n-inf, ezdac~ off, dac~ in the wrong channels). peak = 0 means nothing is\nproduced. busy= counts the eval in flight; after 10 s sclang counts as\nstuck and eval, send, set and evalfile are dropped with an error."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-11",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-14",
+                                        1
+                                    ],
+                                    "source": [
+                                        "obj-13",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-14",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-13",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-15",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-13",
+                                        2
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-16",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-13",
+                                        3
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-17",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-18",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-2",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-3",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-6",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-4",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-7",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-5",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-6",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-7",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-8",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-13",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-9",
+                                        0
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [
+                        170.0,
+                        140.0,
+                        86.0,
+                        23.0
+                    ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p control"
                 }
             },
             {
                 "box": {
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
                     "id": "obj-4",
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
-                    "patching_rect": [ 100.0, 175.0, 110.0, 22.0 ],
-                    "text": "eval 1+1"
+                    "maxclass": "newobj",
+                    "numinlets": 0,
+                    "numoutlets": 0,
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [
+                            0.0,
+                            26.0,
+                            734.0,
+                            694.0
+                        ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "linecount": 2,
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        15.0,
+                                        624.0,
+                                        36.0
+                                    ],
+                                    "text": "@ins N adds N signal inlets to the right of the message inlet. Inlet 2 is SoundIn.ar(0), inlet 3 SoundIn.ar(1), ... @ins is fixed when the object is created. The input path adds two signal vectors of latency."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        85.0,
+                                        44.0,
+                                        23.0
+                                    ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-3",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        70.0,
+                                        85.0,
+                                        52.0,
+                                        23.0
+                                    ],
+                                    "text": "panic"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-4",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        120.0,
+                                        620.0,
+                                        230.0
+                                    ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "// Ring-modulate the input. Move the mouse left and right:\n// MouseX reads the screen pointer.\n(\n{\n    var in = SoundIn.ar(0);\n    var mod = SinOsc.ar(MouseX.kr(30, 2000, 1));\n    (in * mod * 0.3) ! 2\n}.play;\n)\n\n// Comb echo on the input:\n{ CombC.ar(SoundIn.ar(0), 0.2, LFNoise1.kr(0.3).range(0.01, 0.2), 3) * 0.2 ! 2 }.play;\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "maxclass": "newobj",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        "signal"
+                                    ],
+                                    "patching_rect": [
+                                        250.0,
+                                        370.0,
+                                        94.0,
+                                        23.0
+                                    ],
+                                    "text": "cycle~ 220"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "maxclass": "newobj",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        "signal"
+                                    ],
+                                    "patching_rect": [
+                                        250.0,
+                                        400.0,
+                                        62.0,
+                                        23.0
+                                    ],
+                                    "text": "*~ 0.5"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        340.0,
+                                        370.0,
+                                        300.0,
+                                        25.0
+                                    ],
+                                    "text": "or replace it with [adc~ 1] for a microphone"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "maxclass": "newobj",
+                                    "numinlets": 2,
+                                    "numoutlets": 4,
+                                    "outlettype": [
+                                        "signal",
+                                        "signal",
+                                        "",
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        440.0,
+                                        200.0,
+                                        23.0
+                                    ],
+                                    "text": "sc3~ 2 @ins 1"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-9",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        490.0,
+                                        45.0,
+                                        45.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-10",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        550.0,
+                                        620.0,
+                                        21.0
+                                    ],
+                                    "text": "Only one sc3~ per engine owns the input. The message inlet must stay the leftmost one."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-2",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-3",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-4",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-6",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-5",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-8",
+                                        1
+                                    ],
+                                    "source": [
+                                        "obj-6",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-9",
+                                        1
+                                    ],
+                                    "source": [
+                                        "obj-8",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-9",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-8",
+                                        0
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [
+                        266.0,
+                        140.0,
+                        70.0,
+                        23.0
+                    ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p input"
                 }
             },
             {
                 "box": {
+                    "fontname": "Arial",
+                    "fontsize": 13.0,
                     "id": "obj-5",
                     "maxclass": "newobj",
-                    "numinlets": 1,
-                    "numoutlets": 4,
-                    "outlettype": [ "", "", "signal", "signal" ],
-                    "patching_rect": [ 30.0, 220.0, 60.0, 22.0 ],
-                    "text": "sc3~"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-6",
-                    "maxclass": "newobj",
-                    "numinlets": 2,
+                    "numinlets": 0,
                     "numoutlets": 0,
-                    "patching_rect": [ 216.0, 293.0, 50.0, 22.0 ],
-                    "text": "dac~"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-7",
-                    "maxclass": "newobj",
-                    "numinlets": 1,
-                    "numoutlets": 0,
-                    "patching_rect": [ 112.5, 293.0, 90.0, 22.0 ],
-                    "text": "print post"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-8",
-                    "maxclass": "newobj",
-                    "numinlets": 1,
-                    "numoutlets": 0,
-                    "patching_rect": [ 15.0, 293.0, 90.0, 22.0 ],
-                    "text": "print error"
-                }
-            },
-            {
-                "box": {
-                    "id": "obj-9",
-                    "maxclass": "newobj",
-                    "numinlets": 2,
-                    "numoutlets": 4,
-                    "outlettype": [ "", "", "signal", "signal" ],
-                    "patching_rect": [ 110.0, 220.0, 95.0, 22.0 ],
-                    "text": "sc3~ 2 2 @ins 1"
-                }
-            },
-            {
-                "box": {
-                    "fontsize": 11.0,
-                    "id": "obj-10",
-                    "linecount": 18,
-                    "maxclass": "comment",
-                    "numinlets": 1,
-                    "numoutlets": 0,
-                    "patching_rect": [ 15.0, 798.0, 568.0, 215.0 ],
-                    "text": "AUDIO INPUT: @ins N (0..16) adds N signal inlets TO THE RIGHT of the message\ninlet (1 = messages, 2..N+1 = audio). The order is mandatory: with the message\ninlet last, Max 9 sends every connection to the first signal inlet.\nThe object below is `sc3~ 2 2 @ins 1`: ONE audio input (inlet 2 → SoundIn.ar(0))\nand buses 2..3, so it does not collide with the plain [sc3~] that feeds [dac~] on\nbuses 0..1; patch its audio outlets to [dac~ 3 4] to hear it.\nInlet 2+i → World input bus i → SoundIn.ar(i), which is In.ar(numOutputBuses + i).\nThe World has s.options.numInputBusChannels input buses (2 by default); asking for\nmore leaves the missing ones silent and `info` says so.\nOne sc3~ per patch can be the input producer; the others listen to the same one, the\npush is not duplicated. Latency: 2 World blocks (128 samples). Without DSP there\nis no input at all.\nMouseX / MouseY / MouseButton do work: they read the SCREEN mouse (normalized 0..1\nover the main display, 0 at the bottom, 1 at the top; MouseButton = 1 while\nclicking), not the Max patch mouse. To drive SC from the patch use `set` (Synth\nargs) or `eval`.\nFull example (two inputs, @ins 2): tests/input.maxpat — adc~ 1 → inlet 2,\ncycle~ → inlet 3, ring mod with SoundIn."
+                    "patcher": {
+                        "fileversion": 1,
+                        "appversion": {
+                            "major": 9,
+                            "minor": 2,
+                            "revision": 1,
+                            "architecture": "x64",
+                            "modernui": 1
+                        },
+                        "classnamespace": "box",
+                        "rect": [
+                            0.0,
+                            26.0,
+                            734.0,
+                            694.0
+                        ],
+                        "default_fontsize": 13.0,
+                        "showontab": 1,
+                        "boxes": [
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-1",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        15.0,
+                                        620.0,
+                                        21.0
+                                    ],
+                                    "text": "Three ways to stop. Start the pattern and the drone, then compare."
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-2",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        60.0,
+                                        44.0,
+                                        23.0
+                                    ],
+                                    "text": "open"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-3",
+                                    "indexfile": "",
+                                    "maxclass": "sc_code",
+                                    "numinlets": 1,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        95.0,
+                                        620.0,
+                                        300.0
+                                    ],
+                                    "sc_code_caret": 0,
+                                    "sc_code_scroll": 0,
+                                    "sc_code_text": "(\nSynthDef(\\blip, { |out = 0, freq = 440, amp = 0.15|\n    var env = EnvGen.kr(Env.perc(0.01, 0.3), doneAction: 2);\n    Out.ar(out, SinOsc.ar(freq, 0, amp * env) ! 2);\n}).add;\n)\n\n// A pattern plays from a clock: give it the bus explicitly.\n(\nPdef(\\loop, Pbind(\n    \\instrument, \\blip,\n    \\out, ~sc3out,\n    \\degree, Pseq([0, 2, 4, 7, 4, 2], inf),\n    \\dur, 0.2\n)).play;\n)\n\nx = { SinOsc.ar(110 ! 2, 0, 0.05) }.play;  // a drone\n",
+                                    "snippets": ""
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-4",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        415.0,
+                                        68.0,
+                                        23.0
+                                    ],
+                                    "text": "freeall"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-5",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        450.0,
+                                        52.0,
+                                        23.0
+                                    ],
+                                    "text": "panic"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-6",
+                                    "maxclass": "message",
+                                    "numinlets": 2,
+                                    "numoutlets": 1,
+                                    "outlettype": [
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        485.0,
+                                        76.0,
+                                        23.0
+                                    ],
+                                    "text": "hardstop"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-7",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        110.0,
+                                        410.0,
+                                        530.0,
+                                        25.0
+                                    ],
+                                    "text": "frees the nodes: the drone stops, the pattern keeps making new notes"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-8",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        110.0,
+                                        445.0,
+                                        530.0,
+                                        25.0
+                                    ],
+                                    "text": "CmdPeriod.run: nodes, clocks and patterns stop (like Cmd+. in the SC IDE)"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "bubble": 1,
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-9",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        110.0,
+                                        480.0,
+                                        530.0,
+                                        25.0
+                                    ],
+                                    "text": "CmdPeriod.hardRun: also clears TempoClock.default"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-10",
+                                    "maxclass": "newobj",
+                                    "numinlets": 1,
+                                    "numoutlets": 4,
+                                    "outlettype": [
+                                        "signal",
+                                        "signal",
+                                        "",
+                                        ""
+                                    ],
+                                    "patching_rect": [
+                                        20.0,
+                                        530.0,
+                                        62.0,
+                                        23.0
+                                    ],
+                                    "text": "sc3~ 2"
+                                }
+                            },
+                            {
+                                "box": {
+                                    "id": "obj-11",
+                                    "maxclass": "ezdac~",
+                                    "numinlets": 2,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        20.0,
+                                        570.0,
+                                        45.0,
+                                        45.0
+                                    ]
+                                }
+                            },
+                            {
+                                "box": {
+                                    "fontname": "Arial",
+                                    "fontsize": 13.0,
+                                    "id": "obj-12",
+                                    "maxclass": "comment",
+                                    "numinlets": 1,
+                                    "numoutlets": 0,
+                                    "patching_rect": [
+                                        80.0,
+                                        580.0,
+                                        560.0,
+                                        21.0
+                                    ],
+                                    "text": "Each stop fades to silence over 8 ms first, so it does not click. Audio processing keeps running."
+                                }
+                            }
+                        ],
+                        "lines": [
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-11",
+                                        1
+                                    ],
+                                    "source": [
+                                        "obj-10",
+                                        1
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-11",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-10",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-2",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-3",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-4",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-5",
+                                        0
+                                    ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [
+                                        "obj-10",
+                                        0
+                                    ],
+                                    "source": [
+                                        "obj-6",
+                                        0
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    "patching_rect": [
+                        346.0,
+                        140.0,
+                        94.0,
+                        23.0
+                    ],
+                    "saved_object_attributes": {
+                        "fontsize": 13.0
+                    },
+                    "text": "p stopping"
                 }
             }
         ],
-        "lines": [
-            {
-                "patchline": {
-                    "destination": [ "obj-5", 0 ],
-                    "source": [ "obj-12", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-5", 0 ],
-                    "source": [ "obj-14", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-5", 0 ],
-                    "source": [ "obj-16", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-5", 0 ],
-                    "source": [ "obj-3", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-5", 0 ],
-                    "source": [ "obj-4", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-6", 0 ],
-                    "source": [ "obj-5", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-6", 1 ],
-                    "source": [ "obj-5", 1 ]
-                }
-            }
-        ],
+        "lines": [],
         "autosave": 0
     }
 }
