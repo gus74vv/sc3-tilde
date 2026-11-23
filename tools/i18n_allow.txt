@@ -1,0 +1,7 @@
+« test data in Spanish, on purpose. One literal per line, verbatim as it appears in the C source
+« (escapes included). i18n_scan.py skips these exact literals: they are fixtures whose length
+« and byte offsets the asserts depend on, so translating them would break the test.
+« Rule: never add a user-facing message here. See I18N.md §7.4.
+x = 1; // un comentario con ( y \"\n
+\"no soy un string\"\n
+\"ahora sí\";\n
