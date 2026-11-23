@@ -75,7 +75,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/supercollider/build
-          key: sc-statics-${{ runner.arch }}-${{ env.SC_COMMIT }}
+          # The key carries the flags that shape the objects: a deploy target changed in
+          # CMakeLand without a new key restores the old statics (the gate then fails on
+          # minos, and the link warns about "built for newer macOS").
+          key: sc-statics-${{ runner.arch }}-${{ env.SC_COMMIT }}-arm64-minos11
 
       # The cache holds ONLY the build directory, so a cache hit leaves no sources
       # behind and every `#include <SC_…>` fails (measured: "SC_LanguageClient.h
@@ -98,6 +101,8 @@ jobs:
           set -euo pipefail
           cmake -S vendor/supercollider -B vendor/supercollider/build \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DSC_QT=OFF -DSC_IDE=OFF -DSC_ABLETON_LINK=OFF -DSUPERNOVA=OFF \
             -DENABLE_TESTSUITE=OFF
           cmake --build vendor/supercollider/build -j"$(sysctl -n hw.ncpu)"
