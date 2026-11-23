@@ -29,7 +29,7 @@ static void check_int(const char *what, int got, int want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-56s got %d, esperado %d\n", what, got, want);
+		printf("  FAIL %-56s got %d, expected %d\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-56s %d\n", what, got);
 	}
@@ -39,7 +39,7 @@ static void check_bool(const char *what, bool got, bool want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-56s got %s, esperado %s\n", what, got ? "true" : "false", want ? "true" : "false");
+		printf("  FAIL %-56s got %s, expected %s\n", what, got ? "true" : "false", want ? "true" : "false");
 	} else if (gVerbose) {
 		printf("  ok   %-56s %s\n", what, got ? "true" : "false");
 	}
@@ -49,7 +49,7 @@ static void check_dbl(const char *what, double got, double want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-56s got %g, esperado %g\n", what, got, want);
+		printf("  FAIL %-56s got %g, expected %g\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-56s %g\n", what, got);
 	}
@@ -73,7 +73,7 @@ static void check_types(const char *what, const std::vector<Token> &toks, const 
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-56s\n       got  \"%s\"\n       esperado \"%s\"\n", what, got.c_str(), want);
+		printf("  FAIL %-56s\n       got  \"%s\"\n       expected \"%s\"\n", what, got.c_str(), want);
 	} else if (gVerbose) {
 		printf("  ok   %-56s \"%s\"\n", what, got.c_str());
 	}

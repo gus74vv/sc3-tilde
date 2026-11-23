@@ -26,7 +26,7 @@ static void check_int(const char *what, int got, int want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-52s got %d, esperado %d\n", what, got, want);
+		printf("  FAIL %-52s got %d, expected %d\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-52s %d\n", what, got);
 	}
@@ -36,7 +36,7 @@ static void check_str(const char *what, const std::string &got, const std::strin
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-52s got \"%s\", esperado \"%s\"\n", what, got.c_str(), want.c_str());
+		printf("  FAIL %-52s got \"%s\", expected \"%s\"\n", what, got.c_str(), want.c_str());
 	} else if (gVerbose) {
 		printf("  ok   %-52s \"%s\"\n", what, got.c_str());
 	}
@@ -46,7 +46,7 @@ static void check_bool(const char *what, bool got, bool want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-52s got %s, esperado %s\n", what, got ? "true" : "false", want ? "true" : "false");
+		printf("  FAIL %-52s got %s, expected %s\n", what, got ? "true" : "false", want ? "true" : "false");
 	} else if (gVerbose) {
 		printf("  ok   %-52s %s\n", what, got ? "true" : "false");
 	}

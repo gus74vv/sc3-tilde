@@ -29,7 +29,7 @@ static void check_int(const char *what, int got, int want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-60s got %d, esperado %d\n", what, got, want);
+		printf("  FAIL %-60s got %d, expected %d\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-60s %d\n", what, got);
 	}
@@ -39,7 +39,7 @@ static void check_dbl(const char *what, double got, double want) {
 	++gChecks;
 	if (std::fabs(got - want) > 1e-9) {
 		++gFails;
-		printf("  FAIL %-60s got %g, esperado %g\n", what, got, want);
+		printf("  FAIL %-60s got %g, expected %g\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-60s %g\n", what, got);
 	}
@@ -49,7 +49,7 @@ static void check_bool(const char *what, bool got, bool want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-60s got %s, esperado %s\n", what, got ? "true" : "false", want ? "true" : "false");
+		printf("  FAIL %-60s got %s, expected %s\n", what, got ? "true" : "false", want ? "true" : "false");
 	} else if (gVerbose) {
 		printf("  ok   %-60s %s\n", what, got ? "true" : "false");
 	}

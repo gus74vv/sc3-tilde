@@ -136,19 +136,27 @@ int main(int argc, char **argv)
 	eng.eval("SynthDef(\\mtone2, { Out.ar(2, SinOsc.ar(440, 0, 0.5)) }).add;");
 	for (int i = 0; i < 12; ++i)
 		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	// The node count is the baseline, not zero: other Synths may still be alive here.
+	const long unitsBase = eng.numUnits();
 	eng.eval("y = Synth(\\mtone2);");
-	// so that the /s_new reaches the World and the Synth starts
-	// writing
+	// The /s_new is a datagram: it is processed on a render pass, so it needs pulls, and
+	// how many depends on the machine. A single pull plus a fixed sleep was enough
+	// locally and not on the CI runner (measured there: units=0 after one pull + 30 ms),
+	// so poll until the node lands and then let it write a block.
 	std::vector<double> warm(64, 0.0);
 	{
 		Sc3AudioCursor c;
-		eng.resetCursor(c);
 		double *outs[1] = {warm.data()};
-		(void)eng.pull(c, 2, 1, outs, 64);
+		for (int i = 0; i < 300 && eng.numUnits() <= unitsBase; ++i) {
+			eng.resetCursor(c);
+			(void)eng.pull(c, 2, 1, outs, 64);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(30));
 	}
-	check(eng.numUnits() > 0, std::string("Synth creado (units=") +
-	                              std::to_string(eng.numUnits()) + ")");
+	check(eng.numUnits() > unitsBase, std::string("the Synth was created (units=") +
+	                                      std::to_string(eng.numUnits()) + ", baseline " +
+	                                      std::to_string(unitsBase) + ")");
 
 	// --- 1. dos cursores, mismo bus, mismo tick -------------------------------
 	{
@@ -182,7 +190,7 @@ int main(int argc, char **argv)
 		const bool ok2 = eng.pull(c2, 2, 1, o2, 64);
 		check(ok0 && ok2, "cursors on different buses coexist (0 and 2)");
 		check(allZero(l) && allZero(r), "bus 0 silent (nobody writes there)");
-		check(rms(m) > 0.1, std::string("bus 2 suena (RMS ") + std::to_string(rms(m)) + ")");
+		check(rms(m) > 0.1, std::string("bus 2 sounding (RMS ") + std::to_string(rms(m)) + ")");
 	}
 
 	// --- 3. different windows over the same stream ----------------------------
@@ -249,7 +257,7 @@ int main(int argc, char **argv)
 		Sc3AudioCursor c;
 		eng.resetCursor(c);
 		const uint64_t r = eng.renderedSamples();
-		check(c.pos == r, "resetCursor deja pos = renderedSamples (" + std::to_string((long)r) +
+		check(c.pos == r, "resetCursor leaves pos = renderedSamples (" + std::to_string((long)r) +
 		                      ")");
 	}
 

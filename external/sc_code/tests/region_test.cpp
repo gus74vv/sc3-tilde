@@ -49,7 +49,7 @@ static void run(const Case &c) {
 	++gChecks;
 	if (span.kind != c.wantKind) {
 		++gFails;
-		printf("  FAIL %-46s kind=%s, esperado %s\n", c.name, eval_kind_name(span.kind),
+		printf("  FAIL %-46s kind=%s, expected %s\n", c.name, eval_kind_name(span.kind),
 			   eval_kind_name(c.wantKind));
 		return;
 	}
@@ -81,7 +81,7 @@ static void run_region(const char *name, const char *text, int caret, const char
 	++gChecks;
 	if (got != wantText) {
 		++gFails;
-		printf("  FAIL current_region %-30s \"%s\", esperado \"%s\"\n", name, got.c_str(), wantText);
+		printf("  FAIL current_region %-30s \"%s\", expected \"%s\"\n", name, got.c_str(), wantText);
 	}
 }
 

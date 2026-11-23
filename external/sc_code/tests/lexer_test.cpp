@@ -56,7 +56,7 @@ static void check_list(const char *caseName, const std::vector<std::string> &got
 	++gFails;
 	printf("  FAIL %s\n", caseName);
 	print_list("got", got);
-	print_list("esperado", want);
+	print_list("expected", want);
 }
 
 static void check_int(const char *caseName, const char *what, int got, int want) {
@@ -64,7 +64,7 @@ static void check_int(const char *caseName, const char *what, int got, int want)
 	if (got == want)
 		return;
 	++gFails;
-	printf("  FAIL %s (%s): %d, esperado %d\n", caseName, what, got, want);
+	printf("  FAIL %s (%s): %d, expected %d\n", caseName, what, got, want);
 }
 
 /* Single-line case: tokens + outgoing state. */

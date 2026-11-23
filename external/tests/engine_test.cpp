@@ -608,7 +608,7 @@ int main(int argc, char **argv)
 		                    .count();
 		check(!eng.isReady() && !eng.isBooting(),
 		      std::string("close during boot: does not publish ready (") +
-		          std::to_string(ms) + " ms de espera)");
+		          std::to_string(ms) + " ms of wait)");
 		check(ms < 30000, std::string("close during boot does not hang (") +
 		                      std::to_string(ms) + " ms)");
 		Sc3EngineStatus cst = eng.status();

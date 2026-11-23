@@ -26,7 +26,7 @@ static void check_int(const char *what, int got, int want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-58s got %d, esperado %d\n", what, got, want);
+		printf("  FAIL %-58s got %d, expected %d\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-58s %d\n", what, got);
 	}
@@ -36,7 +36,7 @@ static void check_bool(const char *what, bool got, bool want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-58s got %s, esperado %s\n", what, got ? "true" : "false", want ? "true" : "false");
+		printf("  FAIL %-58s got %s, expected %s\n", what, got ? "true" : "false", want ? "true" : "false");
 	} else if (gVerbose) {
 		printf("  ok   %-58s %s\n", what, got ? "true" : "false");
 	}
@@ -52,7 +52,7 @@ static void expect(BracketMatcher &m, const char *what, const std::string &text,
 	++gChecks;
 	if (r.first != f || r.second != s) {
 		++gFails;
-		printf("  FAIL %-58s got (%d,%d), esperado (%d,%d)\n", what, r.first, r.second, f, s);
+		printf("  FAIL %-58s got (%d,%d), expected (%d,%d)\n", what, r.first, r.second, f, s);
 	} else if (gVerbose) {
 		printf("  ok   %-58s (%d,%d)\n", what, r.first, r.second);
 	}

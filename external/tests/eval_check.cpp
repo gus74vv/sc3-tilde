@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 	}
 
 	std::printf("[info] units=%ld peak=%.4f rms_final=%.5f\n", units, globalPeak, lastRms);
-	std::printf("%s\n", (units > 0 && globalPeak > 1e-3) ? "[OK ] suena" : "[WARN] no audio");
+	std::printf("%s\n", (units > 0 && globalPeak > 1e-3) ? "[OK ] sounding" : "[WARN] no audio");
 
 	eng.eval("CmdPeriod.run;");
 	for (int i = 0; i < 200 && eng.numUnits() > 0; ++i) {

@@ -28,7 +28,7 @@ static void check_bool(const char *what, bool got, bool want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-58s got %s, esperado %s\n", what, got ? "true" : "false", want ? "true" : "false");
+		printf("  FAIL %-58s got %s, expected %s\n", what, got ? "true" : "false", want ? "true" : "false");
 	} else if (gVerbose) {
 		printf("  ok   %-58s %s\n", what, got ? "true" : "false");
 	}
@@ -38,7 +38,7 @@ static void check_int(const char *what, int got, int want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-58s got %d, esperado %d\n", what, got, want);
+		printf("  FAIL %-58s got %d, expected %d\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-58s %d\n", what, got);
 	}
@@ -49,7 +49,7 @@ static void check_str(const char *what, const char *got, const char *want) {
 	const char *g = got ? got : "(null)";
 	if (!got || std::strcmp(got, want) != 0) {
 		++gFails;
-		printf("  FAIL %-58s got \"%s\", esperado \"%s\"\n", what, g, want);
+		printf("  FAIL %-58s got \"%s\", expected \"%s\"\n", what, g, want);
 	} else if (gVerbose) {
 		printf("  ok   %-58s \"%s\"\n", what, g);
 	}

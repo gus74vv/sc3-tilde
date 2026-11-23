@@ -28,7 +28,7 @@ static void check_int(const char *what, int got, int want) {
 	++gChecks;
 	if (got != want) {
 		++gFails;
-		printf("  FAIL %-60s got %d, esperado %d\n", what, got, want);
+		printf("  FAIL %-60s got %d, expected %d\n", what, got, want);
 	} else if (gVerbose) {
 		printf("  ok   %-60s %d\n", what, got);
 	}

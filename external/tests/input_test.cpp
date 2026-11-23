@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 		std::this_thread::sleep_for(std::chrono::milliseconds(2));
 		unitsOk = eng.numUnits() > unitsBefore;
 	}
-	check(unitsOk, std::string("Synth de prueba creado (units=") +
+	check(unitsOk, std::string("Synth test created (units=") +
 	                   std::to_string(eng.numUnits()) + ")");
 
 	// --- 2. no producer (equivalent to DSP off / no @ins) --------------------
