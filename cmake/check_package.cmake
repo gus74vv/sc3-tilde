@@ -16,7 +16,10 @@ foreach(_rel
     help/sc_code.maxhelp
     docs/sc3~.maxref.xml
     docs/sc_code.maxref.xml
-    examples/example.maxpat)
+    examples/example.maxpat
+    LICENSE
+    licenses/README.md
+    licenses/SuperCollider.txt)
   if(NOT EXISTS "${STAGE}/${_rel}")
     list(APPEND _missing "${_rel}")
   endif()

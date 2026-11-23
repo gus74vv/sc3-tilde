@@ -70,6 +70,11 @@ FW="$BUNDLE/Contents/Frameworks"
 [[ -d "$RES/SCMaxCompat" ]] || fail "no Resources/SCMaxCompat (Qt-free module)"
 [[ -d "$RES/sounds" ]] || fail "no Resources/sounds (the class library loads files by name)"
 [[ -f "$FW/libsndfile.dylib" ]] || fail "no Frameworks/libsndfile.dylib (the bundled .scx ask for exactly that name)"
+# The payload is somebody else's code: the notices travel with it (licenses/).
+[[ -f "$RES/licenses/README.md" ]] || fail "no Resources/licenses/README.md (third-party notices)"
+for _l in SuperCollider.txt libsndfile.txt LGPL-2.1.txt boost.txt; do
+  [[ -f "$RES/licenses/$_l" ]] || fail "no Resources/licenses/$_l"
+done
 
 PLUGINS="$(find "$RES/plugins" -name "*.scx" -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')"
 (( PLUGINS > 0 )) || fail "no .scx in Resources/plugins"

@@ -6,6 +6,7 @@
 #   help/               the two .maxhelp (Help key / double click)
 #   docs/               the two .maxref.xml (reference viewer)
 #   examples/           the user-facing patches and snippets
+#   licenses/ + LICENSE third-party notices and ours (the payload is SC's code)
 #
 # Run in script mode by the `package` target:
 #   cmake -DSC3_PKG_STAGE=... -DSC3_PKG_METADATA=... -DSC3_MXO=... -P stage_package.cmake
@@ -33,6 +34,8 @@ file(MAKE_DIRECTORY
 file(COPY "${SC3_MXO}" DESTINATION "${SC3_PKG_STAGE}/externals")
 file(COPY "${SC_CODE_MXO}" DESTINATION "${SC3_PKG_STAGE}/externals")
 file(COPY "${SC3_PKG_METADATA}" DESTINATION "${SC3_PKG_STAGE}")
+file(COPY "${ROOT}/LICENSE" DESTINATION "${SC3_PKG_STAGE}")
+file(COPY "${ROOT}/licenses" DESTINATION "${SC3_PKG_STAGE}")
 
 file(GLOB _helps "${ROOT}/external/help/*.maxhelp" "${ROOT}/external/sc_code/help/*.maxhelp")
 file(GLOB _refs "${ROOT}/external/docs/*.maxref.xml")
