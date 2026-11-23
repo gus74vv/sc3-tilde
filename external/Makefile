@@ -52,7 +52,7 @@ $(SANLINK): $(SNDFILE)
 	@mkdir -p $(dir $@)
 	ln -sf ../../../Frameworks/$(SNDFILE_NAME) $@
 
-.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test idle_cost input_test loop_test fail_test evalcheck compat clean bundle sndfile
+.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test idle_cost input_test loop_test fail_test evalcheck compat clean bundle sndfile refs
 
 all: $(BIN)
 
@@ -127,12 +127,19 @@ test: sc_code_test engine_test multi_test reopen_test input_test fail_test
 	./build/input_test
 	./build/fail_test
 
+# Issue #1 item 6: the reference pages (docs/*.maxref.xml) are documentation, nothing
+# compiles them, so a message or an attribute renamed in the sources would leave the
+# page promising something the object no longer answers. Compares the XML with the
+# class_addmethod/CLASS_ATTR of each source.
+refs:
+	python3 check_refs.py
+
 # Closing gate. The headless tests above do NOT compile the sources of the two
 # bundles (sc3_tilde.cpp, sc_code.cpp), so for a while a broken comment block in
 # sc_code.cpp shipped with every test green: the .mxo was simply never rebuilt.
 # The bundles are compiled here (they need the Max SDK; the tests do not).
-gate: test all sc_code_bundle sc_arch
-	@echo "gate: tests + both bundles + sc statics OK"
+gate: refs test all sc_code_bundle sc_arch
+	@echo "gate: refs + tests + both bundles + sc statics OK"
 
 # Issue #1 item 4: the .mxo is arm64-only and the statics it links have to be too
 # (a universal or x86_64 libscsynth.a links fine and then fails to load, and a

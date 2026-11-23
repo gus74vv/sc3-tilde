@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml-stylesheet href="./_c74_ref.xsl" type="text/xsl"?>
+
+<c74object name="sc_code" module="max" category="sc3-tilde">
+	<digest>
+		SuperCollider code editor for sc3~
+	</digest>
+	<description>
+		An in-patch sclang editor with the evaluation keys of the SuperCollider IDE, syntax highlighting, auto-indent, bracket matching, undo, snippets and a call-signature bar. Each evaluation leaves its outlet as one <m>eval</m> message (one symbol, multi-line, no temporary file) and <m>panic</m> leaves the keys that stop the engine; connect the outlet to the message inlet of <o>sc3~</o>. The text is saved with the patch.
+	</description>
+
+	<!--METADATA-->
+	<metadatalist>
+		<metadata name="author">gus74vv</metadata>
+		<metadata name="tag">sc3-tilde</metadata>
+		<metadata name="tag">SuperCollider</metadata>
+		<metadata name="tag">User Interface</metadata>
+		<metadata name="tag">live coding</metadata>
+	</metadatalist>
+
+	<!--INLETS-->
+	<inletlist>
+		<inlet id="0" type="message">
+			<digest>
+				Messages and attributes
+			</digest>
+			<description>
+				Receives <m>theme</m>, <m>themes</m>, <m>snippets</m>, <m>index</m>, <m>scrollspeed</m> and attribute messages.
+			</description>
+		</inlet>
+	</inletlist>
+
+	<!--OUTLETS-->
+	<outletlist>
+		<outlet id="0" type="symbol">
+			<digest>
+				<m>eval</m> code or <m>panic</m>, to <o>sc3~</o>
+			</digest>
+			<description>
+				Each evaluation sends <m>eval</m> followed by the code as one symbol, so line breaks, commas and quotes reach sclang intact. The panic keys send <m>panic</m>. The <m>index</m> message sends the <m>eval</m> that writes the class library index.
+			</description>
+		</outlet>
+	</outletlist>
+
+	<!--ARGUMENTS-->
+	<objarglist />
+
+	<!--MESSAGES-->
+	<methodlist>
+		<method name="(keyboard)">
+			<arglist />
+			<digest>
+				Edit and evaluate
+			</digest>
+			<description>
+				Click the box to give it the focus, then:
+				<br />Shift+Return: evaluate the current line.
+				<br />Cmd+Return: evaluate the selection, else the enclosing <m>( ... )</m> region, else the line. Only round brackets in column 0 form a region, as in the SuperCollider IDE.
+				<br />Cmd+Shift+Return: evaluate the whole text.
+				<br />Ctrl+. or Cmd+/: send <m>panic</m>. Cmd+. is the Max scheduler stop and cannot be used.
+				<br />Cmd+Z, Cmd+Shift+Z: undo, redo. Cmd+X, Cmd+C, Cmd+V, Cmd+A: cut, copy, paste, select all.
+				<br />Tab: insert the suggestion shown in the bar; at the start of an argument, write its keyword (<m>freq: </m>); otherwise indent. Shift+Tab: next suggestion, or outdent. Esc: close the suggestions.
+				<br />Return inserts a line break with the indentation of the SuperCollider IDE.
+			</description>
+		</method>
+		<method name="(mouse)">
+			<arglist />
+			<digest>
+				Select, scroll, context menu
+			</digest>
+			<description>
+				Click and drag to select; the wheel or trackpad scrolls (see <at>scrollspeed</at>). Right-click opens a menu: Undo, Redo, Cut, Copy, Paste, Delete, Select All, <m>Save to .scd</m> and <m>Load from .scd</m>. Saving sets <at>file</at> to the chosen path.
+			</description>
+		</method>
+		<method name="(drag)">
+			<arglist />
+			<digest>
+				Drop files to insert their paths
+			</digest>
+			<description>
+				Dropping files from the Finder inserts their absolute paths at the caret as SuperCollider strings, separated by spaces, ready for <m>Buffer.read</m> or <m>SoundFile.openRead</m>.
+			</description>
+		</method>
+		<method name="theme">
+			<arglist>
+				<arg name="name" optional="0" type="symbol" />
+			</arglist>
+			<digest>
+				Apply a color theme
+			</digest>
+			<description>
+				Same as <at>theme</at>.
+			</description>
+		</method>
+		<method name="themes">
+			<arglist />
+			<digest>
+				Post the theme names
+			</digest>
+			<description>
+				Posts the available themes and the one in use to the Max console.
+			</description>
+		</method>
+		<method name="snippets">
+			<arglist>
+				<arg name="path" optional="1" type="list" />
+			</arglist>
+			<digest>
+				Load a snippets file
+			</digest>
+			<description>
+				Same as <at>snippets</at>. Words split by a message box are joined back with spaces, and one pair of quotes is removed, so <m>snippets '~/My Folder/snips.txt'</m> works. Without a path, the snippets are dropped.
+			</description>
+		</method>
+		<method name="index">
+			<arglist>
+				<arg name="path" optional="1" type="list" />
+			</arglist>
+			<digest>
+				Write the class library index through sc3~
+			</digest>
+			<description>
+				Sends an <m>eval</m> that makes sclang write every class, method and argument name to the index file (see <at>indexfile</at>). The outlet must be connected to a running <o>sc3~</o>. With a path, writes there once instead. Run it again after installing Quarks or changing Extensions.
+			</description>
+		</method>
+		<method name="scrollspeed">
+			<arglist>
+				<arg name="factor" optional="0" type="float" />
+			</arglist>
+			<digest>
+				Set the scroll speed
+			</digest>
+			<description>
+				Same as <at>scrollspeed</at>.
+			</description>
+		</method>
+	</methodlist>
+
+	<!--ATTRIBUTES-->
+	<attributelist>
+		<attribute name="theme" get="1" set="1" type="symbol" size="1">
+			<digest>
+				Color theme (default onedark)
+			</digest>
+			<description>
+				Sets every color in one step: <m>onedark</m>, <m>catppuccin</m>, <m>dracula</m>, <m>nord</m>, <m>gruvbox</m>, <m>monokai</m> or <m>solarized</m>. Aliases are accepted (<m>mocha</m>, <m>solarizeddark</m>, ...). A color set by hand wins over the theme: <o>sc_code @theme nord @bgcolor 1 0 0 1</o> is nord with a red background.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="enum" />
+			</attributelist>
+		</attribute>
+		<attribute name="fontsize" get="1" set="1" type="float" size="1">
+			<digest>
+				Font size in points (6 to 48, default 12)
+			</digest>
+			<description>
+				Size of the monospaced font.
+			</description>
+		</attribute>
+		<attribute name="tabwidth" get="1" set="1" type="int" size="1">
+			<digest>
+				Spaces per indentation level (1 to 16, default 4)
+			</digest>
+			<description>
+				Used by auto-indent and by Tab and Shift+Tab.
+			</description>
+		</attribute>
+		<attribute name="linenumbers" get="1" set="1" type="int" size="1">
+			<digest>
+				Show line numbers (default 1)
+			</digest>
+			<description>
+				Shows the line number gutter on the left.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="readonly" get="1" set="1" type="int" size="1">
+			<digest>
+				Prevent editing (default 0)
+			</digest>
+			<description>
+				With 1, the text cannot be changed, but it can still be selected, copied and evaluated.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="autoclose" get="1" set="1" type="int" size="1">
+			<digest>
+				Insert closing brackets and quotes (default 1)
+			</digest>
+			<description>
+				Typing <m>(</m>, <m>[</m>, <m>{</m> or a quote inserts its closing pair.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="wrap" get="1" set="1" type="int" size="1">
+			<digest>
+				Wrap long lines (default 1)
+			</digest>
+			<description>
+				Wraps lines at the box width for display. The text itself is unchanged.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="matchbrackets" get="1" set="1" type="int" size="1">
+			<digest>
+				Highlight the bracket pair at the caret (default 1)
+			</digest>
+			<description>
+				Highlights the matching bracket with <at>matchcolor</at>.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="titlebar" get="1" set="1" type="int" size="1">
+			<digest>
+				Show the title strip (default 1)
+			</digest>
+			<description>
+				A strip at the top labelled <m>sclang</m>.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="callaid" get="1" set="1" type="int" size="1">
+			<digest>
+				Show the call-signature and completion bar (default 1)
+			</digest>
+			<description>
+				Reserves one line at the bottom of the box. With the caret inside a call it shows the signature, the current argument in <at>barhighlight</at> and its position (<m>2/4</m>); on a name such as <m>Duty.kr</m> it shows the signature alone. From three typed letters it shows the best completion: Tab inserts it. The data comes from the index file (see <m>index</m>); without it the bar stays empty. Typing never changes the text by itself.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="indexfile" get="1" set="1" type="symbol" size="1">
+			<digest>
+				Path of the class library index
+			</digest>
+			<description>
+				Default: <m>sc_code-index.txt</m> next to <m>sc_code.mxo</m>, one file shared by every <o>sc_code</o>. The editor only reads it, and reloads it when it changes, so the bar works without a running engine.
+			</description>
+		</attribute>
+		<attribute name="snippets" get="1" set="1" type="symbol" size="1">
+			<digest>
+				Path of a snippets file
+			</digest>
+			<description>
+				A text file of blocks, each starting with a line <m>### key</m> (key: letters, digits, underscore), followed by its code verbatim. Type <m>snip.key</m> and press Cmd+Return: the text is replaced by the block and nothing is evaluated. Relative, absolute and <m>~</m> paths work; the file is reread when it changes. Saved with the patch.
+			</description>
+		</attribute>
+		<attribute name="file" get="1" set="1" type="symbol" size="1">
+			<digest>
+				Linked .scd file
+			</digest>
+			<description>
+				The file used by <at>autoload</at>, <at>autowrite</at> and the context menu's save item.
+			</description>
+		</attribute>
+		<attribute name="autoload" get="1" set="1" type="int" size="1">
+			<digest>
+				Load <at>file</at> when it is set (default 1)
+			</digest>
+			<description>
+				Replaces the text with the contents of <at>file</at> whenever <at>file</at> is set.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="autowrite" get="1" set="1" type="int" size="1">
+			<digest>
+				Write edits to <at>file</at> (default 0)
+			</digest>
+			<description>
+				Writes the text to <at>file</at> 400 ms after the last edit.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="blink" get="1" set="1" type="int" size="1">
+			<digest>
+				Flash the evaluated text (default 1)
+			</digest>
+			<description>
+				Flashes the evaluated range with <at>blinkcolor</at> for <at>blinkduration</at>.
+			</description>
+			<attributelist>
+				<attribute name="style" get="1" set="1" type="symbol" size="1" value="onoff" />
+			</attributelist>
+		</attribute>
+		<attribute name="blinkduration" get="1" set="1" type="int" size="1">
+			<digest>
+				Flash length in ms (50 to 5000, default 500)
+			</digest>
+			<description>
+				Duration of the evaluation flash.
+			</description>
+		</attribute>
+		<attribute name="scrollspeed" get="1" set="1" type="float" size="1">
+			<digest>
+				Wheel and trackpad scroll factor (0.05 to 50, default 3)
+			</digest>
+			<description>
+				Multiplies the scroll distance of the wheel or trackpad.
+			</description>
+		</attribute>
+		<attribute name="bgcolor" get="1" set="1" type="float" size="4">
+			<digest>Background color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="textcolor" get="1" set="1" type="float" size="4">
+			<digest>Plain text color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="selcolor" get="1" set="1" type="float" size="4">
+			<digest>Selection color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="caretcolor" get="1" set="1" type="float" size="4">
+			<digest>Caret color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="curlinecolor" get="1" set="1" type="float" size="4">
+			<digest>Background of the caret's line</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="keywordcolor" get="1" set="1" type="float" size="4">
+			<digest>Keyword color (var, arg, if, ...)</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="builtincolor" get="1" set="1" type="float" size="4">
+			<digest>Built-in color (nil, true, this, ...)</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="primitivecolor" get="1" set="1" type="float" size="4">
+			<digest>Primitive color (_Name)</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="classcolor" get="1" set="1" type="float" size="4">
+			<digest>Class name color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="symbolcolor" get="1" set="1" type="float" size="4">
+			<digest>Symbol color (\name, 'name', key:)</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="stringcolor" get="1" set="1" type="float" size="4">
+			<digest>String color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="charcolor" get="1" set="1" type="float" size="4">
+			<digest>Character literal color ($a)</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="numbercolor" get="1" set="1" type="float" size="4">
+			<digest>Number color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="envvarcolor" get="1" set="1" type="float" size="4">
+			<digest>Environment variable color (~name)</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="commentcolor" get="1" set="1" type="float" size="4">
+			<digest>Comment color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="bracketcolor" get="1" set="1" type="float" size="4">
+			<digest>Bracket color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="operatorcolor" get="1" set="1" type="float" size="4">
+			<digest>Operator color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="matchcolor" get="1" set="1" type="float" size="4">
+			<digest>Matching bracket highlight</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="blinkcolor" get="1" set="1" type="float" size="4">
+			<digest>Evaluation flash color</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="barcolor" get="1" set="1" type="float" size="4">
+			<digest>Call bar background</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+		<attribute name="barhighlight" get="1" set="1" type="float" size="4">
+			<digest>Current argument in the call bar</digest>
+			<description>RGBA. Default from <at>theme</at>.</description>
+			<attributelist><attribute name="style" get="1" set="1" type="symbol" size="1" value="rgba" /></attributelist>
+		</attribute>
+	</attributelist>
+
+	<!--SEEALSO-->
+	<seealsolist>
+		<seealso name="sc3~" />
+		<seealso name="textedit" />
+	</seealsolist>
+
+	<discussion>
+		<o>sc_code</o> never talks to the engine: it only sends messages from its outlet. Expanding a <m>snip.key</m> sends nothing. Evaluation never writes a file. The text, caret and scroll position are saved with the patch.
+	</discussion>
+</c74object>
