@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
-# sc3~ — Supercollider inside Max
+# sc3~ — SuperCollider inside Max
 
 Two Max externals that bring the SuperCollider engine and an SC-style code editor into a
 Max patch. The engine runs inside Max's process, so a patch does not depend on anything
@@ -23,12 +23,20 @@ else running on the machine:
 * **macOS 11 or newer, Apple Silicon (arm64).** There is no official Intel build; see
   [Building from source](#building-from-source) if you need x86_64.
 * **Max 9** (tested with 9.2).
+* **SuperCollider 3.14.1** (*recommended, not required at run time*) — launching it once
+  creates `~/Library/Application Support/SuperCollider`, with the `sclang_conf.yaml`,
+  `Extensions` and `downloaded-quarks` that `sc3~` compiles at `open`. A Quark installed
+  from the IDE, or a `.sc` file dropped in `Extensions`, is part of your patch's library
+  after the next boot.
+* The same installation documents the library that runs, at the version the payload is
+  pinned to: class reference, UGen arguments, and the source of any method you select.
 
 The machine that runs the object does not need SuperCollider installed. The `.mxo` carries
 the 3.14.1 payload — class library, stock `.scx` UGens, sounds, HID tables — together with
-its own copy of libsndfile, so the engine boots on a Mac that has never seen the SC IDE. The
-installation matters at build time only: `build.sh` copies the payload once, out of
-`/Applications/SuperCollider.app` (point `SC_APP=…` somewhere else to use another copy).
+its own copy of libsndfile, so the engine boots on a Mac that has never seen the SC IDE.
+`build.sh` copies that payload once, out of `/Applications/SuperCollider.app` (point
+`SC_APP=…` somewhere else to use another copy), so building needs an installation anyway;
+the recommendation above is about everything else the installation gives you.
 
 Your own library still loads on top of that payload, with the paths sclang always used:
 
@@ -49,7 +57,7 @@ engine.
 
 ## Install
 
-The download is a Max **package**, not a bag of files. Unzipped it is one folder:
+The download is a Max **package**:
 
 ```
 sc3-tilde/
