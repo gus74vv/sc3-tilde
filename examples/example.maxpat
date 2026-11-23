@@ -375,7 +375,7 @@
                     "numinlets": 1,
                     "numoutlets": 0,
                     "patching_rect": [ 190.0, 184.0, 145.0, 194.0 ],
-                    "text": "<--To stop any running code, use the Ctrl+. shortcut (Ctrl+Period). This will stop all the code scheduled on the clocks, as well as all the sound processes on the audio server.\n\nDO NOT press Cmd+Period. It stops Max Scheduler.\n\n"
+                    "text": "<--To stop any running code, use the Ctrl+. shortcut (Ctrl+Period). This will stop all the code scheduled on the clocks, as well as all the sound processes on the audio server.\n\nFrom the sc_code editor, Cmd+/ does the same.\n\nDO NOT press Cmd+Period. It stops Max Scheduler.\n\n"
                 }
             },
             {

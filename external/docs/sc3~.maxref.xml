@@ -175,7 +175,7 @@
 				Stop everything: CmdPeriod.run
 			</digest>
 			<description>
-				Equivalent to Cmd+. in the SuperCollider IDE: frees all nodes, clears the clocks (Routines, Tasks, patterns) and runs the CmdPeriod hooks. A 8 ms fade to silence comes first, so the cut does not click. Audio processing continues. Do not press Cmd+. in Max: there it stops the Max scheduler.
+				Equivalent to Cmd+. in the SuperCollider IDE: frees all nodes, clears the clocks (Routines, Tasks, patterns) and runs the CmdPeriod hooks. A 8 ms fade to silence comes first, so the cut does not click. Audio processing continues. From the <o>sc_code</o> editor, Ctrl+. or Cmd+/ sends this panic. Do not press Cmd+. in Max: there it stops the Max scheduler.
 			</description>
 		</method>
 		<method name="stop">

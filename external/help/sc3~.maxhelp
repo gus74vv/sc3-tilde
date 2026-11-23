@@ -2012,7 +2012,7 @@
                                         560.0,
                                         21.0
                                     ],
-                                    "text": "Each stop fades to silence over 8 ms first, so it does not click. Audio processing keeps running."
+                                    "text": "Each stop fades to silence over 8 ms first, so it does not click. Audio processing keeps running. From the sc_code editor, Ctrl+. or Cmd+/ sends panic; Cmd+. stops Max's scheduler instead, so avoid it."
                                 }
                             }
                         ],

@@ -81,7 +81,7 @@ including the one-time `index` message.
 
 > **Warning for SuperCollider users:** do **not** press `⌘.` in Max to kill the sound.
 > In Max that is *stop scheduler*, which halts Max's own scheduler and the whole patch
-> stops responding. Use the `panic` message (or `⌃.` inside `sc_code`), which touches
+> stops responding. Use the `panic` message (or `⌃.` / `⌘/` inside `sc_code`), which touches
 > the SC side only. If you already hit it, bring the scheduler back with Max's
 > `Resume`.
 
@@ -318,7 +318,7 @@ message) and try `snip.1` … `snip.4`.
   patch.
 * **`⌘.` is not caught** by the objects, and no external can catch it: Max handles it
   first, as *stop scheduler*. Out of SC habit it is the easiest way to freeze the whole
-  patch. Use the `panic` message, or `⌃.` in `sc_code`.
+  patch. Use the `panic` message, or `⌃.` / `⌘/` in `sc_code`.
 * **One expression per `eval`**: `( … )` for a block, but two sibling `( … )` blocks in one
   call is a parse error.
 * **Inside a pushed `ProxySpace`, `~sc3out` is not the bus.** There it is a JITLib
