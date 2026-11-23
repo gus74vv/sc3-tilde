@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
 	 * IDE (its `currentRegion` does not look at braces either): it is NOT an eval bug.
 	 * The workaround is selecting the block, using ⌘⇧⏎ or wrapping it in `( … )`.
 	 * the design notes */
-	run({ "'{…}' 3 lines, caret on '}' ⇒ evaluates '}' (bug #7)", "{\na\n}", 4, -1, -1, EvalModeRegion, EvalLine,
+	run({ "'{…}' 3 lines, caret on '}' ⇒ evaluates '}' (regression)", "{\na\n}", 4, -1, -1, EvalModeRegion, EvalLine,
 		  "}" });
 
 	/* 12) `(` inside a string is not a token (only the quotes are stored). */

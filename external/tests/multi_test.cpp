@@ -379,20 +379,20 @@ if(p.envir.at(\sc3out).isNil) { "SC3PSNOBUS2".postln } { "SC3PSPOLLUTED2".postln
 		eng.open(cfg, &ownerA); // idempotent per owner (a counter would count twice)
 		eng.open(cfg, &ownerB);
 		check(eng.isReady() && eng.status().bootMs == before,
-		      "bug #23: open() by more owners reuses the running World (no new boot)");
+		      "open() by more owners reuses the running World (no new boot)");
 		eng.release(); // the owner this test opened with (nullptr)
 		eng.release(&ownerA);
-		check(eng.isReady(), "bug #23: the engine stays up while one owner is left");
+		check(eng.isReady(), "the engine stays up while one owner is left");
 		// With a plain counter this one would NOT close (3 opens, 2 releases) — the
 		// reference leaked by the double `open` above was exactly the bug.
 		eng.release(&ownerB);
 		check(!eng.isReady() && std::string(eng.stateName()) == "idle",
-		      std::string("bug #23: the last release tears the World down (state=") +
+		      std::string("the last release tears the World down (state=") +
 		          eng.stateName() + ")");
 		eng.release(&ownerB); // releasing twice must not underflow (the old counter did)
 		eng.release(&stranger); // never an owner
 		check(std::string(eng.stateName()) == "idle",
-		      "bug #23: repeated/foreign release() is a no-op (no underflow)");
+		      "repeated/foreign release() is a no-op (no underflow)");
 	}
 
 	eng.release();

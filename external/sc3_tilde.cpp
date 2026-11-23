@@ -61,7 +61,7 @@
 
 #include "Sc3Engine.h"
 
-#define SC3_TILDE_VERSION "0.16.0"
+#define SC3_TILDE_VERSION "0.16.1"
 
 /* Local gain ramp (anti-click). 8 ms is inaudible as a fade and is enough for
    the cut not to be heard. SC's stop is queued AFTER the ramp reached

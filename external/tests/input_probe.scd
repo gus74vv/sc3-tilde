@@ -1,6 +1,6 @@
 // input_probe.scd — Phase 3.8: does signal reach INPUT bus 1 (inlet 2 of [sc3~])?
 //
-// Context (handoff notes, input smoke): the `input.maxpat` patch wires
+// Context (input smoke): the `input.maxpat` patch wires
 //
 //   [adc~ 1]  ──► inlet 1 → input bus 0 → SoundIn.ar(0)  → LEFT channel
 //   [cycle~]  ──► inlet 2 → input bus 1 → SoundIn.ar(1)  → RIGHT channel

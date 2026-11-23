@@ -357,8 +357,15 @@ int main(int argc, char **argv)
 	// --- 3.6: bundles with a future timetag ---------------------------
 	// NodeProxy:free sends the /n_free of the group at fadeTime + server.latency:
 	// if the engine executed it instantly, any fade would cut hard
-	// (Ndef(\rthm).clear(10)). Here: /n_free scheduled at 500 ms ⇒ the synth has
-	// to be alive at 200 ms and dead at 800 ms.
+	// (Ndef(\rthm).clear(10)). Here: /n_free scheduled at 2.5 s ⇒ the synth has
+	// to be alive at 300 ms and dead at 3 s.
+	//
+	// The timetag has to be generous: a bundle carries a *wall-clock* deadline
+	// (sclang converts `secondsFromNow` against `Main.elapsedTime`) while the World
+	// advances by rendered blocks, and the earlier tests pump faster than real time,
+	// so the audio clock can sit ahead of the wall clock. With a short timetag the
+	// bundle is already due on a slow machine and runs instantly — measured on the
+	// CI runner: `units=0` at the 200 ms check with a 500 ms timetag, green locally.
 	{
 		auto pumpForMs = [&](int ms, bool sleep) {
 			const int blockMs =
@@ -370,10 +377,10 @@ int main(int argc, char **argv)
 					std::this_thread::sleep_for(std::chrono::milliseconds(blockMs));
 			}
 		};
-		eng.evalSilent("s.sendBundle(0.5, [11, x.nodeID]);"); // /n_free en ~500 ms
-		pumpForMs(200, true);
+		eng.evalSilent("s.sendBundle(2.5, [11, x.nodeID]);"); // /n_free ~2.5 s
+		pumpForMs(300, true);
 		const long unitsEarly = eng.numUnits();
-		pumpForMs(600, true);
+		pumpForMs(2600, true);
 		const long unitsLate = eng.numUnits();
 		check(unitsEarly > 0,
 		      std::string("bundle with a future timetag is NOT run instantly (units=") +
@@ -424,11 +431,12 @@ int main(int argc, char **argv)
 		      "without DSP the World answers /sync (the reply reaches sclang)");
 
 		// 3.6 with DSP off: the timetagged bundle still expires (before, it
-		// never expired, because it was only dispatched inside renderBlock).
-		eng.evalSilent("s.sendBundle(0.3, [11, y.nodeID]);");
-		pumpIdleForMs(150);
+		// never expired, because it was only dispatched inside renderBlock). Same
+		// wall-clock margin as the block above.
+		eng.evalSilent("s.sendBundle(1.0, [11, y.nodeID]);");
+		pumpIdleForMs(300);
 		const long earlyUnits = eng.numUnits();
-		pumpIdleForMs(400);
+		pumpIdleForMs(1200);
 		const long lateUnits = eng.numUnits();
 		check(earlyUnits > unitsBefore && lateUnits == unitsBefore,
 		      std::string("without DSP the timetagged bundle expires anyway (units ") +
@@ -510,10 +518,10 @@ int main(int argc, char **argv)
 		const long after = eng.numUnits();
 		std::string panicErr = eng.takeError();
 		check(after == floor,
-		      std::string("bug #22: the timetag bundles do not survive CmdPeriod (units=") +
+		      std::string("the timetag bundles do not survive CmdPeriod (units=") +
 		          std::to_string(after) + ", floor " + std::to_string(floor) + ")");
 		check(panicErr.find("not found") == std::string::npos,
-		      "bug #22: no orphan /s_new (err='" + panicErr + "')");
+		      "no orphan /s_new (err='" + panicErr + "')");
 	}
 
 	// --- a graph that ends in its FIRST calc is not resurrected --------
@@ -542,7 +550,7 @@ int main(int argc, char **argv)
 			pumpBlocks(1, 4);
 		const long after = eng.numUnits();
 		check(after == floor,
-		      std::string("bug #36: a node that ends in its first calc is deleted (units=") +
+		      std::string("a node that ends in its first calc is deleted (units=") +
 		          std::to_string(after) + ", floor " + std::to_string(floor) + ")");
 	}
 

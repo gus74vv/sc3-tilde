@@ -8,8 +8,7 @@
 //   [adc~ 1]  ──► inlet 2 → input bus 0 → SoundIn.ar(0)  → LEFT channel
 //   [cycle~]  ──► inlet 3 → input bus 1 → SoundIn.ar(1)  → RIGHT channel
 //
-// (inlet 1 = messages: open, info, eval… — the order is mandatory, see bug #8
-//  of the handoff notes: with the messages last, Max 9.2 routes everything to the first inlet.)
+// (inlet 1 = messages: open, info, eval… — the order is mandatory: with the messages last, Max 9.2 routes everything to the first inlet.)
 //
 // MONO version of the original snippet: `SoundIn.ar(0, 0.5)` (a single bus) and
 // `Ndef(\ringmod).play(0, 1)` (a single output bus) ⇒ it plays on one channel only.

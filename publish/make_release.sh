@@ -11,7 +11,8 @@
 #   KEEP_STAGE=1 ./publish/make_release.sh # leave release/stage around to inspect
 #
 # Output (in release/):
-#   sc3-<ver>-arm64.zip        both bundles + help + README + LICENSE + licenses/ + examples/
+#   sc3-<ver>-arm64.zip        the Max package (package-info.json + externals/ + help/
+#                              + docs/ + examples/ + LICENSE + licenses/)
 #   sc3-<ver>-arm64.zip.sha256
 #
 # The artifact name has no `~`: GitHub strips it from uploaded asset names, so a zip
@@ -37,25 +38,26 @@ ZIP="release/$NAME.zip"
 echo "== release $VER (sc3~) / $SC_CODE_VER (sc_code)"
 echo "   stage: $STAGE"
 
-# 1. Bundles: build + sign + verify (make gate would also run the tests; that is the
-#    job of the closing gate, not of packaging). The .mxo is assembled by build.sh,
-#    which installs to the Max Library unless SC3_OUTDIR is given.
-SC3_OUTDIR="$PWD/release/bundle" ./external/build.sh >/dev/null
-make -s -C external/sc_code bundle
-codesign --verify --strict "release/bundle/sc3~.mxo"
-codesign --verify --strict external/sc_code/build/sc_code.mxo
+# 1. Stage the Max package: exactly what `install-package` copies into
+#    ~/Documents/Max 9/Packages (cmake/package.cmake). The bundles are built and signed
+#    ad-hoc by CMake from the same flags as sc.mk; the payload is staged by the build.
+#    The download is a package, not a bag of .mxo files: Max loads it from Packages and
+#    finds the objects and their help patches without anything in Library.
+cmake -S "$ROOT" -B build >/dev/null
+cmake --build build --target package >/dev/null
+PKG_NAME="sc3-tilde"
+PKG="build/package/$PKG_NAME"
+[[ -d "$PKG" ]] || { echo "ERROR: $PKG was not staged" >&2; exit 1; }
+codesign --verify --strict "$PKG/externals/sc3~.mxo"
+codesign --verify --strict "$PKG/externals/sc_code.mxo"
+PKG_VER="$(sed -n 's/.*"version" *: *"\([0-9.]*\)".*/\1/p' "$PKG/package-info.json")"
+[[ "$PKG_VER" == "$VER" ]] || {
+  echo "ERROR: package-info.json says $PKG_VER, the sources say $VER" >&2; exit 1; }
 
-# 2. Stage: what a user needs to install, and nothing else.
-rm -rf "$STAGE"
-mkdir -p "$STAGE/help"
-cp -R release/bundle/sc3~.mxo "$STAGE/"
-cp -R external/sc_code/build/sc_code.mxo "$STAGE/"
-cp external/help/sc3~.maxhelp "$STAGE/help/"
-cp external/sc_code/help/sc_code.maxhelp "$STAGE/help/"
-cp README.md LICENSE "$STAGE/"
-cp -R licenses "$STAGE/"   # third-party notices: the bundle carries SC's payload
-[[ -d examples ]] && cp -R examples "$STAGE/examples"
-find "$STAGE" -name '.DS_Store' -delete
+# 2. The archive root is the package folder: unzipping gives `sc3-tilde/`, ready to be
+#    moved into ~/Documents/Max 9/Packages.
+rm -rf "$STAGE"; mkdir -p "$STAGE"
+cp -R "$PKG" "$STAGE/$PKG_NAME"
 
 # 3. Zip (ditto keeps the bundle structure and the signature).
 #    --norsrc/--noextattr: without them ditto writes an AppleDouble `._name` for every
@@ -64,12 +66,12 @@ find "$STAGE" -name '.DS_Store' -delete
 #    Contents/_CodeSignature, not in xattrs, so dropping them costs nothing.
 mkdir -p release
 rm -f "$ZIP" "$ZIP.sha256"
-ditto -c -k --keepParent --norsrc --noextattr "$STAGE" "$ZIP"
+ditto -c -k --keepParent --norsrc --noextattr "$STAGE/$PKG_NAME" "$ZIP"
 #    The checksum line carries only the file NAME (no `release/` prefix): whoever
 #    downloads the two assets runs `shasum -a 256 -c sc3-<ver>-arm64.zip.sha256` in the
 #    download folder, where that prefix does not exist.
 (cd "$(dirname "$ZIP")" && shasum -a 256 "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
-if [[ "${KEEP_STAGE:-0}" != "1" ]]; then rm -rf "$STAGE" release/bundle; fi
+if [[ "${KEEP_STAGE:-0}" != "1" ]]; then rm -rf "$STAGE"; fi
 
 echo
 echo "== $ZIP ($(du -h "$ZIP" | cut -f1))"

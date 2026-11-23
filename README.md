@@ -7,7 +7,7 @@ else running on the machine:
 
 | object | version | what it is |
 |---|---|---|
-| `sc3~` | 0.16.0 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
+| `sc3~` | 0.16.1 | Runs **sclang + scsynth in-process** inside Max. You send it SuperCollider code; the audio lands on Max's own audio buses, so it can be patched, mixed and processed like any other Max signal. |
 | `sc_code` | 0.9.14 | An in-patch code editor with the SuperCollider IDE's evaluation UX (`⇧Return`, `⌘Return`, `⌘⇧Return`), syntax highlighting, undo, auto-indent, bracket matching, snippets and a `.scd` open/save menu. A bottom bar shows the signature of the call under the caret (current argument highlighted) and offers completion: the editor *shows*, nothing is written while you type. Its outlet sends the evaluated block to `sc3~`. |
 
 ```
@@ -49,14 +49,32 @@ engine.
 
 ## Install
 
-1. Copy `sc3~.mxo` and `sc_code.mxo` into any folder located within Max's Search Path — the
-   **User Library** (`~/Documents/Max 9/Library`) is always in the path.
-2. Copy `sc3~.maxhelp` and `sc_code.maxhelp` into `~/Documents/Max 9/Library/help`. For a
-   shorter and more practical overview than the help patches, open `examples/example.maxpat`.
-3. **Restart Max** (`.mxo` files are loaded when the app starts).
+The download is a Max **package**, not a bag of files. Unzipped it is one folder:
 
-The `licenses/` folder of the zip is the third-party notice bundle; it can stay next to the
-objects, nothing loads it at run time.
+```
+sc3-tilde/
+├── package-info.json      what Max reads to list it in the Package Manager
+├── externals/             sc3~.mxo and sc_code.mxo
+├── help/                  sc3~.maxhelp and sc_code.maxhelp
+├── docs/                  the reference pages
+├── examples/              example.maxpat
+├── licenses/              third-party notices
+├── README.md
+└── LICENSE
+```
+
+1. Unzip the download.
+2. Move the `sc3-tilde` folder into `~/Documents/Max 9/Packages` (Max creates that folder on
+   first launch; the same place it puts the packages the Package Manager installs).
+3. **Restart Max** (the objects are loaded when the app starts).
+
+Max scans `Packages` on launch, so both objects are available from any patch, their help is
+reachable with **⌥-click** without copying anything into `Library`, and Max loads exactly one
+copy of each object even if an older `.mxo` is still around. Nothing in the package is
+loaded at run time except the two bundles; `licenses/` and `docs/` are there to be read.
+
+Building from source installs the same layout (`cmake --build build --target install-package`);
+see [Building from source](#building-from-source).
 
 Builds are signed ad-hoc, so macOS Gatekeeper will block the download; see
 [Gatekeeper](#macos-gatekeeper).
@@ -337,11 +355,11 @@ message) and try `snip.1` … `snip.4`.
 
 ## macOS Gatekeeper
 
-The release is signed **ad-hoc**, so a freshly downloaded bundle is quarantined:
+The release is signed **ad-hoc**, so a freshly downloaded bundle is quarantined. Clear
+the flag on the package once after moving it into place:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Documents/Max\ 9/Library/sc3~.mxo
-xattr -dr com.apple.quarantine ~/Documents/Max\ 9/Library/sc_code.mxo
+xattr -dr com.apple.quarantine ~/Documents/Max\ 9/Packages/sc3-tilde
 ```
 
 Builds from source on your own machine have no quarantine flag and need nothing extra.
@@ -363,6 +381,9 @@ cd external && ./build.sh
 
 # 3. the editor
 cd external/sc_code && make bundle install
+
+# 4. or install the package the release ships, instead of 2 + 3
+cd .. && cmake --build build --target install-package
 ```
 
 `build.sh` needs an installed `SuperCollider.app`: `scripts/stage_bundle.sh` takes the
