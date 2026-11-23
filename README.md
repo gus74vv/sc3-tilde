@@ -403,6 +403,15 @@ compiled on top of the bundled class library, the degraded boot, and audio from 
 1367 editor checks. The suite is **not** part of this tree, so there is no `make test`
 here — it lives with the development repository, next to the design notes.
 
+## Credits
+
+The Max package layout, the CMake build, the self-contained payload and the tabbed help
+patches come from [shakfu](https://github.com/shakfu)'s fork, proposed in
+[issue #1](https://github.com/gus74vv/sc3-tilde/issues/1); the channel labels, the outlet
+order and the `nm -m` symbol check are items of that same list. They were ported by
+reimplementing them in this tree, with his authorship on the commits that carry his code
+and text.
+
 ## License
 
 GPL-3.0-only — see [LICENSE](LICENSE). The engine links SuperCollider's statics
