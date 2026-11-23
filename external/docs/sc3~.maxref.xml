@@ -6,7 +6,7 @@
 		SuperCollider (sclang + scsynth) inside Max
 	</digest>
 	<description>
-		Runs the SuperCollider 3.14.1 language (sclang) and synthesis server (scsynth) in the Max process. Send it SuperCollider code with <m>eval</m>; the audio of the SuperCollider buses it serves comes out of its signal outlets. The class library and the UGen plugins come from an installed SuperCollider 3.14.x, the same files the IDE loads (a self-contained bundle is planned). The object itself asks for nothing else: its only non-Apple dependency, libsndfile, travels inside the .mxo.
+		Runs the SuperCollider 3.14.1 language (sclang) and synthesis server (scsynth) in the Max process. Send it SuperCollider code with <m>eval</m>; the audio of the SuperCollider buses it serves comes out of its signal outlets. The bundle is self-contained: the class library, the stock UGen plugins, the sounds and libsndfile (its only non-Apple dependency) travel inside the .mxo, so no SuperCollider installation is needed at run time. Your own Extensions and Quarks are compiled on top of that library, so they work as in the IDE. <m>SC3_APP_PATH</m> still points the engine at a real installation instead (development, with the version policy below).
 	</description>
 
 	<!--METADATA-->

@@ -4,9 +4,9 @@
 SuperCollider engine inside Max. Same process. Audio on Max's buses.
 Editor included: sc_code.
 
-Reqs: macOS Apple Silicon · Max 9 · [SuperCollider 3.14.1](https://github.com/supercollider/supercollider).
-The external compiles your installed class library, so your Quarks
-and extensions work as-is.
+Reqs: macOS Apple Silicon · Max 9. No SuperCollider installation: the engine
+3.14.1 (class library, UGens, libsndfile) travels inside the .mxo.
+Your Quarks and extensions are compiled on top, so they work as-is.
 No Qt in the engine: plot, Window and the rest of the GUI don't work.
 Max is the UI.
 

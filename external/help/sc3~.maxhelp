@@ -280,7 +280,7 @@
                                         620.0,
                                         80
                                     ],
-                                    "text": "sc3~ runs SuperCollider 3.14.1 inside Max. sc_code sends each evaluation as one eval message. The class library and the UGens come from an installed SuperCollider 3.14.x,\nthe same files the IDE loads. Do not press Cmd+. \nin Max: it stops Max's scheduler. Use panic."
+                                    "text": "sc3~ runs SuperCollider 3.14.1 inside Max. sc_code sends each evaluation as one eval message. The class library, the UGens and libsndfile\ntravel inside the .mxo: no SuperCollider installation needed. Your Quarks and Extensions are compiled on top. Do not press Cmd+. \nin Max: it stops Max's scheduler. Use panic."
                                 }
                             }
                         ],

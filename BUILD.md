@@ -12,9 +12,12 @@ Download-only users do not need any of this: the release carries the package.
 * Xcode Command Line Tools.
 * Max 9 with the **max-sdk** package installed (Max → Options → Package Manager →
   max-sdk), used as `~/Documents/Max 9/Packages/max-sdk/source/max-sdk-base`.
-* An installed **SuperCollider 3.14.1** (`/Applications/SuperCollider.app`). Its
-  class library and its libsndfile are used at runtime and at link time; the same
-  version is vendored in `vendor/supercollider` with its statics already built
+* An installed **SuperCollider 3.14.1** (`/Applications/SuperCollider.app`),
+  needed at BUILD time only: `external/scripts/stage_bundle.sh` copies its class
+  library, its stock `.scx`, the sounds, the HID tables and libsndfile into the
+  `.mxo`, so the built bundle runs on a machine that has no SuperCollider (that
+  is why `SC_APP` picks the source). The same version is vendored in
+  `vendor/supercollider` with its statics already built
   (`vendor/supercollider/build`, tag `Version-3.14.1`).
 
 `SC_APP`, `MAX_SDK` and `SC3_SR` override the paths above.
@@ -62,5 +65,8 @@ one it finds and fails with a duplicate-object warning.
 editor's unit tests, the SuperCollider statics) plus the bundle checks: one arch
 only, deployment target, ad-hoc signature that verifies, no dependency outside
 macOS/Max/the bundle, and the flat-namespace symbols Max has to export. The
+payload inside `sc3~.mxo` is checked too (class library, stock `.scx` without
+the `_supernova` pair, sounds, and every one of those binaries single-slice,
+signed and resolving libsndfile through `@loader_path` inside the bundle). The
 package layout is a gate too: a missing folder is not an error Max reports, the
 object simply does not exist.
