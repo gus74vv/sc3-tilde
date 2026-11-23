@@ -53,6 +53,8 @@ cmake --build build --target package           # build/package/sc3-tilde
     help/                the two .maxhelp
     docs/                the two .maxref.xml (reference viewer)
     examples/            example.maxpat, snippets, superdirt patches
+    licenses/            third-party notices (the bundle carries SC's payload)
+    LICENSE              our GPL-3.0-only text
 
 Copy that folder into `~/Documents/Max 9/Packages` (or
 `cmake --build build --target install-package`) and restart Max. Do not keep a
@@ -69,4 +71,6 @@ payload inside `sc3~.mxo` is checked too (class library, stock `.scx` without
 the `_supernova` pair, sounds, and every one of those binaries single-slice,
 signed and resolving libsndfile through `@loader_path` inside the bundle). The
 package layout is a gate too: a missing folder is not an error Max reports, the
-object simply does not exist.
+object simply does not exist. The third-party notices (`licenses/`) are part of
+that layout: both bundles carry their own copy at
+`Contents/Resources/licenses/`, and the gate fails without it.
