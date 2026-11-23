@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Compile-only CI: this tree does not ship the test suite (see README), so the job
-# proves that a clean clone can build both bundles on Apple Silicon and that the
-# results are sane: arm64 slice, ad-hoc signature, and no dynamic dependency outside
-# Apple's system paths, @loader_path and @executable_path.
+# CI: a clean clone builds both bundles on Apple Silicon and runs the gates that do
+# not need Max (the suites, the reference pages, the statics' architecture, the
+# language and license checks). It also checks the build results are sane: arm64
+# slice, ad-hoc signature, and no dynamic dependency outside Apple's system paths,
+# @loader_path and @executable_path.
+#
+# `make gate` locally is the same plus the two bundles and the full instance matrix,
+# which the job already covers by building them with build.sh above.
 name: build
 
 on:
@@ -136,3 +140,16 @@ jobs:
             if [ -n "$bad" ]; then echo "unexpected dependency:"; echo "$bad"; exit 1; fi
           done
           ls -la out/sc3~.mxo/Contents external/sc_code/build | head -20
+
+      # The suites compile against the SC statics built above and boot the installed
+      # class library; the self-contained test reuses the payload build.sh staged.
+      - name: Suites, reference pages and statics
+        working-directory: external
+        env:
+          SC3_OUTDIR: ${{ github.workspace }}/out
+        run: make refs test sc_arch
+
+      - name: Language and license gates
+        run: |
+          python3 tools/i18n_scan.py --strict
+          python3 tools/spdx.py check

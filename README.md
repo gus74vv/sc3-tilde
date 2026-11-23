@@ -400,8 +400,26 @@ The engine and the editor are tested headless (no Max needed): 183 engine checks
 failure matrix (broken Quark, throwing `startup.scd`, corrupt `.scx`, port mismatch,
 impossible boot, eval that throws), the payload checks (a user Extension and a user Quark
 compiled on top of the bundled class library, the degraded boot, and audio from both) and
-1367 editor checks. The suite is **not** part of this tree, so there is no `make test`
-here — it lives with the development repository, next to the design notes.
+1367 editor checks. The suites and their fixtures are in this tree.
+
+The two that need nothing but a compiler:
+
+```bash
+cd external && make test          # engine, instance matrix, payload (needs SC 3.14.1)
+cd external/sc_code && make test  # 1367 editor checks, no SC and no Max
+```
+
+And the closing gate, which also compiles both bundles (this is the one to run before
+opening a pull request; it needs the Max SDK, see `BUILD.md`):
+
+```bash
+cd external && make gate          # reference pages + suites + both bundles + statics
+ctest --test-dir build            # or through CMake, after `cmake -S . -B build`
+```
+
+CI runs the suites, the reference-page check, the statics' architecture check and the
+language/license gates on every pull request. Two things it cannot check and are done by
+hand: Max's GUI (there is no headless loader for a jbox) and the x86_64 slice.
 
 ## Credits
 
@@ -420,6 +438,21 @@ GPL-3.0, plus libsndfile (LGPL-2.1) and the libraries those link. Their notices 
 the bundle: `licenses/` is inside `sc3~.mxo/Contents/Resources/` and in the release zip, and
 `licenses/README.md` maps each component to its license and file. Sources are published with
 every release.
+
+## Contributing
+
+Pull requests are welcome and are merged into this tree as they come. A patch is easier to
+take if it runs the gate first:
+
+```bash
+cd external && make gate                                   # suites + both bundles + statics
+cd external/sc_code && make test && cd .. && python3 tools/spdx.py check
+python3 tools/i18n_scan.py --strict                        # user-facing text is in English
+```
+
+Every source file carries an SPDX line (`GPL-3.0-only`, or the matching one for vendored
+code); the gates above fail without it. Contributions come in under the same license as
+the rest of the tree.
 
 ## Support
 
