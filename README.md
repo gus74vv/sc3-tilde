@@ -68,6 +68,9 @@ sc3-tilde/
    first launch; the same place it puts the packages the Package Manager installs).
 3. **Restart Max** (the objects are loaded when the app starts).
 
+If you installed a previous version by hand, remove those copies from
+`~/Documents/Max 9/Library` (the two `.mxo` and the two `.maxhelp`): Max would load both.
+
 Max scans `Packages` on launch, so both objects are available from any patch, their help is
 reachable with **⌥-click** without copying anything into `Library`, and Max loads exactly one
 copy of each object even if an older `.mxo` is still around. Nothing in the package is
