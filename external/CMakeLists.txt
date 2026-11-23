@@ -38,8 +38,14 @@ target_include_directories(sc3_tilde PRIVATE "${MAXINC}" "${MSPINC}")
 target_compile_options(sc3_tilde PRIVATE
   ${SC_CXX_INCLUDES}
   -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type-mismatch)
+# The payload is copied by a POST_BUILD step, which only runs when the target
+# relinks: list what goes into it, so editing the notices or the copy recipe
+# restages instead of leaving a bundle that lies about its contents.
+file(GLOB SC3_LICENSE_FILES "${CMAKE_SOURCE_DIR}/licenses/*")
 set_property(TARGET sc3_tilde APPEND PROPERTY LINK_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in")
+  "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/scripts/stage_bundle.sh"
+  ${SC3_LICENSE_FILES})
 target_link_options(sc3_tilde PRIVATE
   -undefined dynamic_lookup
   -F${MSPINC})   # MaxAudioAPI lives in the SDK, not in the system frameworks
@@ -88,6 +94,8 @@ sc3_headless(multi multi_test)
 sc3_headless(reopen reopen_test)
 sc3_headless(input input_test)
 sc3_headless(fail fail_test)
+# issue #1 item 9: the packaged library + user Extensions/Quarks (D3). The target stages build/payload with the same script the bundle runs.
+sc3_headless(selfcontained selfcontained_test)
 
 # The engine samples at the server rate; 44.1 kHz is the other path through the
 # buffer setup, so it is a case of its own.

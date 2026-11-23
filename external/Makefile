@@ -55,7 +55,7 @@ $(SANLINK): $(SNDFILE)
 	@mkdir -p $(dir $@)
 	ln -sf ../../../Frameworks/$(SNDFILE_NAME) $@
 
-.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test idle_cost input_test loop_test fail_test evalcheck compat clean bundle sndfile refs
+.PHONY: all test gate sc_code_bundle coexist sc_code_test stress engine_test multi_test reopen_test idle_cost input_test loop_test fail_test evalcheck selfcontained_test payload compat clean bundle sndfile refs
 
 all: $(BIN)
 
@@ -85,6 +85,24 @@ evalcheck: tests/eval_check.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDF
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) \
 	    tests/eval_check.cpp Sc3Engine.cpp -o build/eval_check $(SC_LIBS)
+
+# Issue #1 item 9 (D3): a staged payload OUTSIDE any bundle, so the headless test
+# can boot the packaged library + .scx without opening Max. Same script the .mxo
+# runs POST_BUILD: the test cannot pass on a payload that differs from the shipped
+# one. Payload lives in build/ (gitignored, 11 MB).
+PAYLOAD := build/payload
+$(PAYLOAD)/Contents/Resources/SCClassLibrary: scripts/stage_bundle.sh $(SNDFILE)
+	@mkdir -p $(PAYLOAD)/Contents/MacOS
+	SC_APP="$(SC_APP)" sh scripts/stage_bundle.sh $(PAYLOAD) $(SC3_ARCH)
+
+payload: $(PAYLOAD)/Contents/Resources/SCClassLibrary
+
+# Issue #1 item 9 (D3): user Extensions + Quarks on top of the packaged library
+# (self-contained boot, degrade path, and audio from what they compile).
+selfcontained_test: tests/selfcontained_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient.h $(SNDFILE) $(PAYLOAD)/Contents/Resources/SCClassLibrary
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) $(ARCHFLAGS) $(SC_CXX_INCLUDES) $(EXTRA_CXXFLAGS) \
+	    tests/selfcontained_test.cpp Sc3Engine.cpp -o build/selfcontained_test $(SC_LIBS) $(EXTRA_LDFLAGS)
 
 # (diagnostic, not part of the gate): evaluates a LIST of .scd files in the
 # embedded engine and says whether each one returned or left sclang stuck. The
@@ -122,13 +140,14 @@ compat:
 coexist: engine_test
 	python3 tests/coexist_check.py ./build/engine_test
 
-test: sc_code_test engine_test multi_test reopen_test input_test fail_test
+test: sc_code_test engine_test multi_test reopen_test input_test fail_test selfcontained_test
 	./build/engine_test
 	SC3_SR=44100 ./build/engine_test
 	./build/multi_test
 	./build/reopen_test
 	./build/input_test
 	./build/fail_test
+	./build/selfcontained_test
 
 # Issue #1 item 6: the reference pages (docs/*.maxref.xml) are documentation, nothing
 # compiles them, so a message or an attribute renamed in the sources would leave the
@@ -244,5 +263,6 @@ $(SANDIR)/loop_test: tests/loop_test.cpp Sc3Engine.cpp Sc3Engine.h Sc3LangClient
 
 clean:
 	rm -rf build/sc3~ build/engine_test build/multi_test build/input_test build/loop_test build/fail_test \
+	    build/selfcontained_test build/payload \
 	    build/engine_test_out.wav build/san Frameworks
 	    build/engine_test_out.wav build/san Frameworks
