@@ -29,7 +29,10 @@ SPDX = 'SPDX-License-Identifier: GPL-3.0-only'
 SLASH_EXTS = {'.c', '.cc', '.cpp', '.h', '.hpp', '.mm', '.sc'}
 HASH_EXTS = {'.sh', '.py', '.mk'}
 MAKE_NAMES = {'Makefile', 'makefile', 'GNUmakefile'}
-SKIP_DIRS = {'vendor', 'build', '.git', 'Frameworks', 'backup', 'spike', '__pycache__'}
+# Directories that are not ours or not sources: the vendored SuperCollider and the Max
+# SDK are clones (CI puts max-sdk/ next to the tree), build/ and out/ hold output.
+SKIP_DIRS = {'vendor', 'build', 'out', '.git', 'Frameworks', 'backup', 'spike',
+             'max-sdk', '__pycache__'}
 
 
 def walk(root):
