@@ -27,7 +27,7 @@ MAXSDK="${MAX_SDK:-$HOME/Documents/Max 9/Packages/max-sdk/source/max-sdk-base}"
 OUTDIR="${SC3_OUTDIR:-$HOME/Documents/Max 9/Library}"
 MINOS="${SC3_MINOS:-11.0}"
 ARCH="${SC3_ARCH:-arm64}"
-VER="${SC3_VERSION:-0.15.11}"
+VER="${SC3_VERSION:-0.16.0}"
 BUILD="$HERE/build"
 BIN="$BUILD/sc3~"
 BUNDLE="$OUTDIR/sc3~.mxo"
@@ -70,13 +70,23 @@ mkdir -p "$HELPDIR"
 # The installed copy can be NEWER than the repo one: that happens when the layout is
 # fixed inside Max (moving comment boxes) and saved there. Overwriting it silently
 # would throw that work away, so warn instead and keep the installed file.
-if [ -f "$HELPDIR/sc3~.maxhelp" ] && [ "$HELPDIR/sc3~.maxhelp" -nt "help/sc3~.maxhelp" ]; then
-    echo "   help -> NOT copied: $HELPDIR/sc3~.maxhelp is newer than help/sc3~.maxhelp"
-    echo "           (did you edit it in Max? copy it into the repo and build again)"
-else
-    cp "help/sc3~.maxhelp" "$HELPDIR/sc3~.maxhelp"
-    echo "   help -> $HELPDIR/sc3~.maxhelp (double click the object or 'Open Help')"
-fi
+install_help() {
+    local src="$1" dst="$HELPDIR/$(basename "$1")"
+    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+        echo "   help -> $dst (already up to date)"
+    elif [ -f "$dst" ] && [ "$dst" -nt "$src" ]; then
+        echo "   help -> NOT copied: $dst is newer than $src"
+        echo "           (did you edit it in Max? copy it into the repo and build again)"
+    else
+        cp "$src" "$dst"
+        echo "   help -> $dst (double click the object or 'Open Help')"
+    fi
+}
+install_help "help/sc3~.maxhelp"
+# sc_code is a bundle of its own, but its help patch is wired to sc3~: if it is
+# not refreshed, a patch whose connections were moved to the new outlet indices
+# stays on the installed copy and goes silent.
+install_help "sc_code/help/sc_code.maxhelp"
 
 echo "   -> $BUNDLE"
 file "$BUNDLE/Contents/MacOS/sc3~"

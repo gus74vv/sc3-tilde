@@ -16,12 +16,15 @@
  *   `@port N` (4.x): UDP port of the World. Default 0 = AUTO — the kernel picks
  *   a free one and the object's sclang follows it (`9_SC3ServerPort.sc`), so it
  *   coexists with the SC IDE, which always keeps 57110.
- *   OUTLETS (numbered right to left as in Max):
- *       outlet 0      = error          (text)
- *       outlet 1      = post           (text) — SC console
- *       outlet 2..n+1 = audio ch n-1 … ch 0 (signal)
- *   The signal outlets are created first (ch 0 → ch n-1) so that the `outs`
- *   array in `perform64` is [0]=ch0 (bus busoff), [1]=ch1, …
+ *   OUTLETS (left to right, which is also the index):
+ *       outlet 0..n-1 = audio ch 0 … ch n-1 (signal)
+ *       outlet n      = error          (text)
+ *       outlet n+1    = post           (text) — SC console
+ *   Issue #1 item 10 (breaking, v0.16): `outlet_new` INSERTS each new outlet to
+ *   the LEFT and the index is the position from the left, so the creation order
+ *   is post, error, ch(n-1) … ch0 to end up with ch0 leftmost. MSP's `outs[]`
+ *   carries only the SIGNAL outlets, in creation order ⇒ OCH[ch] =
+ *   outs[n-1-ch] in perform64 (measured: `info` reports numouts = nchan).
  *
  * Evaluated code receives `~sc3out` (base bus of THIS instance) and `~sc3n`
  * (channels), both in the topEnvironment: `Out.ar(~sc3out, sig)` or, directly,
@@ -56,7 +59,7 @@
 
 #include "Sc3Engine.h"
 
-#define SC3_TILDE_VERSION "0.15.11"
+#define SC3_TILDE_VERSION "0.16.0"
 
 /* Local gain ramp (anti-click). 8 ms is inaudible as a fade and is enough for
    the cut not to be heard. SC's stop is queued AFTER the ramp reached
@@ -71,8 +74,8 @@ typedef struct _sc3 {
 	long port;           /* 4.x: World UDP port. 0 = auto (the kernel picks it) */
 	long allowscversion; /* 4.2: 1 = accept a SuperCollider install with another minor version */
 	Sc3AudioCursor cur;  /* 3.5: read position in the World stream */
-	void *out_post;      /* outlet 1 */
-	void *out_err;       /* outlet 0 */
+	void *out_post;      /* outlet n+1 (rightmost text outlet) */
+	void *out_err;       /* outlet n (text) */
 	double sr;           /* DSP chain sample rate, refreshed in dsp64 */
 	double sr_warned;    /* 3.2: last sample rate reported as differing from the World */
 	long maxvec;         /* DSP chain maxvectorsize */
@@ -101,6 +104,17 @@ typedef struct _sc3 {
 	   is only touched by the audio thread. 5 ms linear ramp. */
 	std::atomic<float> gain_target;
 	float gain;
+	/* Last block's peak written to the audio outlets (absolute value). It is the
+	   one number that splits "the engine is not producing audio" from "the audio
+	   leaves the object but something downstream eats it" (a muted live.gain~, a
+	   gain slider at -inf, ezdac~ off). Read by `info` from main. */
+	std::atomic<float> outPeak;
+	/* Last perform64 facts, so `info` can answer "is MSP giving me signal
+	   buffers?": how many blocks ran, what `numouts` was, and which slots of
+	   `outs[]` came back NULL (bit i = slot i is NULL). */
+	std::atomic<long> dspBlocks;
+	std::atomic<long> dspNumouts;
+	std::atomic<unsigned> dspNulls;
 	/* the "eval is not returning" error was already posted for the eval in
 	   flight (cleared when sclang goes back to idle). */
 	int stuck_warned;
@@ -450,6 +464,22 @@ static void sc3_report_status(t_sc3 *x)
 	sc3_post(x, "  3.5: ch=%ld buses=%ld..%ld (of %ld served) underruns=%ld",
 	         x->nchan, x->busoff, x->busoff + x->nchan - 1, eng.servedBuses(),
 	         eng.underruns());
+	/* dsp64: what MSP hands over to perform64. `S` = signal buffer, `-` = NULL
+	   slot; `peak` is the last block that left the audio outlets. */
+	{
+		char slots[20] = "(no block yet)";
+		const long n = std::min<long>(x->dspNumouts.load(std::memory_order_relaxed), 8);
+		const unsigned mask = x->dspNulls.load(std::memory_order_relaxed);
+		if (x->dspBlocks.load(std::memory_order_relaxed) > 0) {
+			for (long i = 0; i < n; ++i)
+				slots[i] = ((mask >> i) & 1u) ? '-' : 'S';
+			slots[n] = 0;
+		}
+		sc3_post(x, "  dsp64: blocks=%ld numouts=%ld slots=%s peak=%.4f",
+		         x->dspBlocks.load(std::memory_order_relaxed),
+		         x->dspNumouts.load(std::memory_order_relaxed), slots,
+		         (double)x->outPeak.load(std::memory_order_relaxed));
+	}
 	if (x->ins > 0) {
 		/* 3.8: audio input. `World` = effective input buses (s.options).
 		   `pushed` only advances if this instance is the producer and DSP is running. */
@@ -899,16 +929,15 @@ static void sc3_assist(t_sc3 *x, void *b, long m, long a, char *s)
 			         "panic (Cmd+.), hardstop, freeall, console 0|1, debug 0|1, "
 			         "port <n>, bang; @ins N (signal inlets), @port N (0 = auto)");
 	} else {
-		// 3.5: error = 0, post = 1, audio ch n-1 = 2 … ch 0 = n+1.
+		// Issue #1 item 10: audio = 0 … n-1, then error = n, post = n+1.
 		const long n = x->nchan;
-		if (a == 0)
+		if (a >= 0 && a < n)
+			snprintf(s, 256, "audio ch%ld (signal, bus %ld)", a, x->busoff + a);
+		else if (a == n)
 			snprintf(s, 256, "error (text)");
-		else if (a == 1)
+		else if (a == n + 1)
 			snprintf(s, 256, "post / SC console (text)");
-		else if (a >= 2 && a <= n + 1) {
-			const long ch = n + 1 - a;
-			snprintf(s, 256, "audio ch%ld (signal, bus %ld)", ch, x->busoff + ch);
-		} else
+		else
 			snprintf(s, 256, "outlet %ld", a);
 	}
 }
@@ -1048,6 +1077,18 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 {
 	(void)dsp64; (void)flags; (void)userparam;
 
+	/* Diagnostic for `info`: record what MSP hands over (how many slots and which
+	   of them are NULL). Two atomic stores per block. */
+	{
+		unsigned mask = 0;
+		const long n = std::min<long>(numouts, 16);
+		for (long i = 0; i < n; ++i)
+			if (!outs[i])
+				mask |= 1u << i;
+		x->dspNulls.store(mask, std::memory_order_relaxed);
+		x->dspNumouts.store(numouts, std::memory_order_relaxed);
+	}
+
 	/* `eng.isReady()` is about the SHARED World, not about this object.
 	   An instance that never attached (no `open`/eval/panic) or that was `close`d
 	   must not listen: it reads buses that another instance's code may be writing,
@@ -1075,12 +1116,27 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 	}
 
 	const long nch = x->nchan;
+	/* Measured (Max 9.2, `info` → `dsp64: numouts=2` with nch=2): MSP hands
+	   `outs[]` over with ONE ENTRY PER **SIGNAL** OUTLET — the two text outlets are
+	   not in the array — always in CREATION order. So the earlier `numouts < nch+2`
+	   bailed on every block (silence, no crash, World kept running) and the slots
+	   must be mirrored by `nch-1-ch`, not `nch+1-ch`. */
 	if (nch <= 0 || numouts < nch || !outs[0]) {
 		for (long i = 0; i < numouts; i++)
 			if (outs[i])
 				memset(outs[i], 0, (size_t)sampleframes * sizeof(double));
 		return;
 	}
+
+	/* Issue #1 item 10: for the patch cords, channel `ch` IS outlet `ch`, and the
+	   outlets were created post, error, ch(n-1) … ch0 (each new outlet goes to the
+	   LEFT, so the visual order ends up ch0, ch1, …, error, post). `outs[]` carries
+	   only the signal outlets, in creation order ⇒ outs[0] = ch(n-1) …
+	   outs[n-1] = ch0. OCH[] is the mirror: the only place where this mapping
+	   exists (creation, this array and sc3_assist are the three places that agree). */
+	double *och[16];
+	for (long ch = 0; ch < nch; ++ch)
+		och[ch] = outs[nch - 1 - ch];
 
 	// Gain ramp (5 ms): cutting to zero mid-wave produces a broadband click. The
 	// target is set by main (panic → 0, eval → 1).
@@ -1095,10 +1151,10 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 	Sc3Engine &eng = Sc3Engine::instance();
 	bool ok = false;
 	if (eng.isReady())
-		ok = eng.pull(x->cur, x->busoff, (int)nch, outs, sampleframes);
+		ok = eng.pull(x->cur, x->busoff, (int)nch, och, sampleframes);
 	if (!ok)
 		for (long ch = 0; ch < nch; ++ch)
-			memset(outs[ch], 0, (size_t)sampleframes * sizeof(double));
+			memset(och[ch], 0, (size_t)sampleframes * sizeof(double));
 
 	// There is a single gain ramp for all channels (the fade belongs to the
 	// object, not to a channel). The target is set by main (panic → 0, eval → 1).
@@ -1114,9 +1170,28 @@ static void sc3_perform64(t_sc3 *x, t_object *dsp64, double **ins, long numins,
 		}
 		if (g != 1.0f)
 			for (long ch = 0; ch < nch; ++ch)
-				outs[ch][i] *= (double)g;
+				och[ch][i] *= (double)g;
 	}
 	x->gain = g;
+
+	/* Diagnostic for `info`: the peak of what actually left the object. It is the
+	   one number that splits "the engine no longer produces audio" from "the audio
+	   leaves the object and something downstream eats it" (a live.gain~ slider at
+	   -inf, an ezdac~ switched off). */
+	{
+		float pk = 0.0f;
+		for (long ch = 0; ch < nch; ++ch) {
+			const double *o = och[ch];
+			for (long i = 0; i < sampleframes; ++i) {
+				const double a = o[i] < 0.0 ? -o[i] : o[i];
+				if (a > pk)
+					pk = (float)a;
+			}
+		}
+		x->outPeak.store(pk, std::memory_order_relaxed);
+		x->dspBlocks.store(x->dspBlocks.load(std::memory_order_relaxed) + 1,
+		                   std::memory_order_relaxed);
+	}
 }
 
 /* --- 3.3: pump with DSP off -----------------------------------------------
@@ -1394,12 +1469,17 @@ static void *sc3_new(t_symbol *s, long argc, t_atom *argv)
 	}
 	x->created = 1;
 
-	/* Creation order = left→right; the last one created is outlet 0.
-	   ⇒ error = 0, post = 1, audio ch n-1 = 2 … ch 0 = n+1. */
-	for (long ch = 0; ch < x->nchan; ++ch)
-		outlet_new(x, "signal");
+	/* Issue #1 item 10 (BREAKING: the indices of the audio outlets change).
+	   `outlet_new` inserts each new outlet to the LEFT and the patch index is the
+	   position from the left, so to get `0..n-1 = audio ch 0..n-1` the audio has to
+	   be created LAST and in DESCENDING order: the visual order ends up
+	   ch0 | ch1 | … | ch(n-1) | error | post ⇒ 0 = ch0, n = error, n+1 = post. The
+	   audio side needs the mirror in perform64 (OCH[]), which is the only place
+	   where the mapping lives. */
 	x->out_post = outlet_new(x, NULL);
 	x->out_err  = outlet_new(x, NULL);
+	for (long ch = x->nchan; ch-- > 0; )
+		outlet_new(x, "signal");
 
 	x->sr = 0.0;
 	x->maxvec = 0;
@@ -1408,6 +1488,10 @@ static void *sc3_new(t_symbol *s, long argc, t_atom *argv)
 	x->boot_seen = 0;
 	x->gain = 1.0f;
 	x->gain_target.store(1.0f);
+	x->outPeak.store(0.0f);
+	x->dspBlocks.store(0);
+	x->dspNumouts.store(0);
+	x->dspNulls.store(0u);
 	x->clock = clock_new(x, (method)sc3_flush);
 	clock_delay(x->clock, 200);
 	x->stop_clock = clock_new(x, (method)sc3_finish_stop);

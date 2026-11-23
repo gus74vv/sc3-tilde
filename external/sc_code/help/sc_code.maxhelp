@@ -219,14 +219,12 @@
             },
             {
                 "patchline": {
-                    "destination": [ "obj-7", 1 ],
-                    "source": [ "obj-5", 3 ]
+                    "destination": [ "obj-7", 0 ], "source": [ "obj-5", 0 ]
                 }
             },
             {
                 "patchline": {
-                    "destination": [ "obj-7", 0 ],
-                    "source": [ "obj-5", 2 ]
+                    "destination": [ "obj-7", 1 ], "source": [ "obj-5", 1 ]
                 }
             }
         ],
