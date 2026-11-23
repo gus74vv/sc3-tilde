@@ -1,42 +1,38 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""check_flat_symbols.py — gate: el .mxo de Max no debe tener símbolos sin resolver.
+"""check_flat_symbols.py — gate: the .mxo must not reference Max symbols that Max
+does not export.
 
-Un bundle de Max se linkea con `-undefined dynamic_lookup`: el linker NO verifica
-que los símbolos existan, los busca en el "flat namespace" del proceso Max al
-cargarlo. Si falta un símbolo de **función**, el dlopen pasa y el crash aparece
-recién al llamarlo; si falta un símbolo de **datos**, el dlopen falla y Max dice:
+A Max bundle is linked with `-undefined dynamic_lookup`: the linker checks nothing
+and dyld resolves the missing symbols **by name** in the process' flat namespace.
+If one of those symbols is a **function**, dlopen succeeds and the crash appears
+only when it is called; if it is a **data** symbol, dlopen fails and Max says:
 
     unable to load object bundle executable: The bundle "sc3~.mxo" couldn't be loaded.
     (log) dlopen(..., 0x0106): symbol not found in flat namespace '__common_symbols'
 
-Es exactamente lo que pasó con los macros `_sym_*` de commonsyms.h (dependen del
-global `_common_symbols`, que Max NO exporta): se arregla usando `USESYM(foo)`.
+That is exactly what happened with the `_sym_*` macros of commonsyms.h (they depend
+on the global `_common_symbols`, which Max does NOT export): the fix is `USESYM(foo)`.
 
-El gate compara los símbolos indefinidos del binario contra:
-  1. lo que exporta Max (binario + Frameworks),
-  2. lo que exporta el SDK de macOS (`*.tbd`: libSystem, frameworks),
-  3. lo que exportan las dylibs que viajan en el bundle (libsndfile),
-más una allowlist de símbolos que se resuelven por otras vías (clases ObjC,
-`dyld_stub_binder`).
+What is checked: only the undefined symbols that `nm -m` reports as
+`(dynamically looked up)` — the ones the linker left to the flat namespace. Every
+other undefined symbol is bound to a named library (libSystem, the frameworks, the
+dylibs that travel in the bundle): dyld resolves it by path and refuses to load the
+bundle with a clear message if it is missing, so there is nothing to guess here.
+That makes the gate both cheap (26 symbols instead of 712) and precise.
 
-Uso:
-    python3 check_flat_symbols.py <binario|bundle.mxo> [--max /Applications/Max.app]
-Salida: lista de símbolos sin resolver + exit 1 si hay alguno.
+Usage:
+    python3 check_flat_symbols.py <binary|bundle.mxo> [--max /Applications/Max.app]
+                                               [--require-max]
+Exit: 0 = all flat-namespace symbols are exported by Max, 1 = some are missing (or
+Max is absent while --require-max was passed), 2 = bad usage.
 """
 import glob
 import os
-import re
 import subprocess
 import sys
 
-# Symbols that do not appear in the .tbd but resolve at runtime:
-#   · _OBJC_CLASS_$_*  → Foundation/AppKit ObjC classes (dyld loads them from the system)
-#   · dyld_stub_binder → dyld injects it into the binary itself
-ALLOW = (
-    re.compile(r'^_OBJC_(CLASS|METACLASS)_\$_'),
-    re.compile(r'^dyld_stub_binder$'),
-)
+MARK = '(dynamically looked up)'
 
 
 def nm(args):
@@ -56,40 +52,24 @@ def exported(path):
     return out
 
 
-def undefined(path):
+def flat_undefined(path):
+    """Undefined symbols the linker left for the flat namespace.
+
+    `nm -m -u` prints one line per undefined symbol, e.g.
+        (undefined) external _atom_getfloat (from libSystem)
+        (undefined) external _class_new (dynamically looked up)
+    so only the second kind can be resolved by name (or not) at load time.
+    """
     out = set()
-    for line in nm(['-u', path]).splitlines():
-        parts = line.split()
-        if parts:
-            sym = parts[-1]
-            if sym.startswith('_'):
-                out.add(sym)
+    for line in nm(['-m', '-u', path]).splitlines():
+        if MARK not in line:
+            continue
+        out |= {t for t in line.split() if t.startswith('_') and not t.startswith('(')}
     return out
 
 
-def tbd_symbols():
-    try:
-        sdk = subprocess.check_output(['xcrun', '--show-sdk-path']).decode().strip()
-    except Exception:
-        return set()
-    pats = [
-        sdk + '/usr/lib/*.tbd',
-        sdk + '/System/Library/Frameworks/*.tbd',
-        sdk + '/System/Library/Frameworks/*/Versions/A/*.tbd',
-        sdk + '/System/Library/Frameworks/*.framework/Versions/A/Frameworks/*.tbd',
-    ]
-    files = []
-    for p in pats:
-        files += glob.glob(p)
-    syms = set()
-    for f in files:
-        try:
-            txt = open(f, errors='ignore').read()
-        except OSError:
-            continue
-        for m in re.finditer(r'_([A-Za-z_][A-Za-z0-9_$.]*)', txt):
-            syms.add('_' + m.group(1))
-    return syms
+def all_undefined(path):
+    return {line.split()[-1] for line in nm(['-u', path]).splitlines() if line.split()}
 
 
 def main():
@@ -103,7 +83,13 @@ def main():
 
     img = target
     if os.path.isdir(target) or target.endswith('.mxo'):
-        img = os.path.join(target, 'Contents', 'MacOS', os.path.basename(target).replace('.mxo', ''))
+        img = os.path.join(target, 'Contents', 'MacOS',
+                           os.path.basename(target).replace('.mxo', ''))
+
+    flat = flat_undefined(img)
+    if not flat:
+        print('   symbols: no flat-namespace lookup, nothing to check OK')
+        return 0
 
     have = set()
     maxbin = os.path.join(maxapp, 'Contents', 'MacOS', 'Max')
@@ -116,30 +102,25 @@ def main():
         # Without the Max binary there is nothing to compare against: every Max API
         # symbol would look unresolved. Skip the gate instead of failing (the CI has
         # no Max installed); `--require-max` forces the failure where Max does exist.
-        why = ('no Max found at %s, and this gate needs its export list' % maxapp)
+        why = 'no Max found at %s, and this gate needs its export list' % maxapp
         if '--require-max' in sys.argv:
             print('ERROR: %s' % why, file=sys.stderr)
             return 1
         print('   symbols: SKIPPED (%s; run it on a machine with Max, or pass '
               '--max <path>)' % why, file=sys.stderr)
         return 0
-    have |= tbd_symbols()
-    # dylibs that travel in the bundle (e.g. libsndfile)
-    for lib in glob.glob(os.path.join(os.path.dirname(os.path.dirname(img)), 'Frameworks', '*.dylib')):
-        have |= exported(lib)
 
-    missing = sorted(s for s in undefined(img) if s not in have
-                     and not any(p.match(s) for p in ALLOW))
+    missing = sorted(s for s in flat if s not in have)
     if missing:
-        print('ERROR: %d unresolved symbol(s) in %s (Max does not export them ⇒ the '
+        print('ERROR: %d flat-namespace symbol(s) in %s are not exported by Max (the '
               'bundle will not load):' % (len(missing), img), file=sys.stderr)
         for s in missing:
             print('  ' + s, file=sys.stderr)
         print('Hint: the `_sym_*` macros need `_common_symbols`; use USESYM(x).',
               file=sys.stderr)
         return 1
-    print('   symbols: %d undefined, all resolvable by Max/SDK OK'
-          % len(undefined(img)))
+    print('   symbols: %d flat-namespace of %d undefined, all exported by Max OK'
+          % (len(flat), len(all_undefined(img))))
     return 0
 
 

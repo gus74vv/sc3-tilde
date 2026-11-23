@@ -131,8 +131,14 @@ test: sc_code_test engine_test multi_test reopen_test input_test fail_test
 # bundles (sc3_tilde.cpp, sc_code.cpp), so for a while a broken comment block in
 # sc_code.cpp shipped with every test green: the .mxo was simply never rebuilt.
 # The bundles are compiled here (they need the Max SDK; the tests do not).
-gate: test all sc_code_bundle
-	@echo "gate: tests + both bundles OK"
+gate: test all sc_code_bundle sc_arch
+	@echo "gate: tests + both bundles + sc statics OK"
+
+# Issue #1 item 4: the .mxo is arm64-only and the statics it links have to be too
+# (a universal or x86_64 libscsynth.a links fine and then fails to load, and a
+# minos above the bundle's is the same kind of surprise). See scripts/build_sc.sh.
+sc_arch:
+	@./scripts/build_sc.sh --check
 
 sc_code_bundle:
 	$(MAKE) --no-print-directory -C sc_code bundle
