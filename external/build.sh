@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-only
-# build.sh — builds the external sc3~ as .mxo and installs it in the User Library.
+# build.sh — builds the external sc3~ as .mxo and installs it inside the Max package.
 #
 # Usage:
-#   ./build.sh                  # builds + installs in ~/Documents/Max 9/Library
+#   ./build.sh                  # builds + installs in ~/Documents/Max 9/Packages/sc3-tilde
 #   SC3_OUTDIR=/tmp/ext ./build.sh
 #   EXTRA_CXXFLAGS=... EXTRA_LDFLAGS=... ./build.sh
 #
-# CAREFUL: the destination has to be a folder of the Max search path. The one Max
-# always adds is "User Library" (~/Documents/Max 9/Library). `Max 9/externals`
-# is NOT in the search path ⇒ the object shows up as "No such object".
+# The way this is distributed is a Max package, so that is where the dev loop installs
+# too: `<package>/externals/sc3~.mxo` and the help patches in `<package>/help/`. Keeping
+# a copy in ~/Documents/Max 9/Library as well would make Max load two of each object with
+# no way to tell which one is live. Install the package once with
+# `cmake --build build --target install-package` (or point SC3_OUTDIR somewhere else in
+# the Max search path, which is what a scratch build does).
 #
 # The .mxo is SELF-CONTAINED (issue #1, item 9): the Max object + Sc3Engine +
 # the SuperCollider statics (sclang + scsynth) + the class library, the stock
@@ -26,16 +29,23 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
 MAXSDK="${MAX_SDK:-$HOME/Documents/Max 9/Packages/max-sdk/source/max-sdk-base}"
-OUTDIR="${SC3_OUTDIR:-$HOME/Documents/Max 9/Library}"
+PKG="${SC3_PKG_DIR:-$HOME/Documents/Max 9/Packages/sc3-tilde}"
+OUTDIR="${SC3_OUTDIR:-$PKG/externals}"
 MINOS="${SC3_MINOS:-11.0}"
 ARCH="${SC3_ARCH:-arm64}"
-VER="${SC3_VERSION:-0.16.0}"
+VER="${SC3_VERSION:-$(sed -n 's/^#define SC3_TILDE_VERSION "\(.*\)"/\1/p' sc3_tilde.cpp)}"
 BUILD="$HERE/build"
 BIN="$BUILD/sc3~"
 BUNDLE="$OUTDIR/sc3~.mxo"
 
 [[ -d "$MAXSDK/c74support/max-includes" ]] || {
   echo "ERROR: no Max SDK at $MAXSDK (MAX_SDK?)" >&2; exit 1; }
+if [[ -z "${SC3_OUTDIR:-}" && ! -d "$PKG" ]]; then
+  echo "ERROR: no package at $PKG" >&2
+  echo "       install it once:  cmake --build build --target install-package" >&2
+  echo "       or send the bundle elsewhere with SC3_OUTDIR=<folder in the search path>" >&2
+  exit 1
+fi
 [[ -d ../vendor/supercollider/build ]] || {
   echo "ERROR: missing ../vendor/supercollider/build (build the vendored SC)" >&2; exit 1; }
 
@@ -63,9 +73,14 @@ printf 'iLaXmax2' > "$BUNDLE/Contents/PkgInfo"
 # and libsndfile). Same script the CMake POST_BUILD runs: one implementation.
 scripts/stage_bundle.sh "$BUNDLE" "$ARCH" "${SC_APP:-/Applications/SuperCollider.app}"
 
-# Help of the object (args, outlets, multi-instance). Max looks for it in the
-# "help" folder of the user search path: ~/Documents/Max 9/Library/help/.
-HELPDIR="$(dirname "$BUNDLE")/help"
+# Help of the object (args, outlets, multi-instance). Max looks for it in the `help`
+# folder of a search path: for the package that is <package>/help, which is where the
+# release ships it too (`externals/help` would just sit there unseen).
+if [[ -n "${SC3_OUTDIR:-}" ]]; then
+    HELPDIR="$(dirname "$BUNDLE")/help"      # scratch layout: keep it next to the bundle
+else
+    HELPDIR="$PKG/help"
+fi
 mkdir -p "$HELPDIR"
 # The installed copy can be NEWER than the repo one: that happens when the layout is
 # fixed inside Max (moving comment boxes) and saved there. Overwriting it silently
@@ -90,10 +105,10 @@ install_help "sc_code/help/sc_code.maxhelp"
 
 echo "   -> $BUNDLE"
 file "$BUNDLE/Contents/MacOS/sc3~"
-du -sh "$BUNDLE" | sed 's/^/   tamaño: /'
+du -sh "$BUNDLE" | sed 's/^/   size: /'
 
 # # --- the .mxo depends on nothing outside macOS + Max + itself
-# Acepta /usr/lib, /System/Library, @executable_path (frameworks de Max) y
+# Allowed: /usr/lib, /System/Library, @executable_path (Max frameworks) and
 # @loader_path (nuestra libsndfile). Cualquier otra cosa = falla el build.
 check_deps() {
   local label="$1" img="$2" bad
@@ -102,7 +117,7 @@ check_deps() {
   bad="$(otool -L "$img" | grep -E '^[[:space:]]' | awk '{print $1}' \
          | grep -v -E '^(/usr/lib/|/System/Library/|@executable_path/|@loader_path/)' || true)"
   if [[ -n "$bad" ]]; then
-    echo "ERROR: $label tiene dependencias externas:" >&2
+    echo "ERROR: $label links against something outside the bundle:" >&2
     echo "$bad" | sed 's/^/       /' >&2
     exit 1
   fi
@@ -140,7 +155,7 @@ python3 "$HERE/check_flat_symbols.py" "$BIN" || exit 1
 codesign --force --deep --sign - "$BUNDLE" 2>/dev/null || \
   echo "   WARNING: codesign failed (CLT without codesign?) — Max may reject the bundle"
 
-codesign --verify --strict "$BUNDLE" && echo "   firma: ad-hoc OK"
+codesign --verify --strict "$BUNDLE" && echo "   signature: ad-hoc OK"
 
 # Same checker the CMake/ctest path runs (arch, minos, signature, deps): the two
 # recipes have to produce the same bundle.

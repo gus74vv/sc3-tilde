@@ -11,7 +11,12 @@
 
 MAX_SDK ?= $(HOME)/Documents/Max 9/Packages/max-sdk/source/max-sdk-base
 MAXINC  := $(MAX_SDK)/c74support/max-includes
+# Two destinations: the package carries the distributed objects and their help
+# (`cmake --build build --target install-package` puts it in Packages), while the User
+# Library is the search path for scratch bundles such as the keylog spike.
 MAX_LIBRARY ?= $(HOME)/Documents/Max 9/Library
+MAX_PKG      ?= $(HOME)/Documents/Max 9/Packages/sc3-tilde
+MAX_EXTERNALS ?= $(MAX_PKG)/externals
 
 CXX      := c++
 # -Wno-cast-function-type-mismatch: class_addmethod's `(method)` casts look like that in the Max API
@@ -185,16 +190,17 @@ $(B)/sc_code.mxo: $(UI_SRC) $(UI_HDR) bundle/Info.plist.in $(CORE_SRC) $(CORE_HD
 bundle: $(B)/sc_code.mxo
 
 install: $(B)/sc_code.mxo install-help
-	@mkdir -p "$(MAX_LIBRARY)"
-	rm -rf "$(MAX_LIBRARY)/sc_code.mxo"
-	cp -R $(B)/sc_code.mxo "$(MAX_LIBRARY)/sc_code.mxo"
-	codesign --verify --deep --strict "$(MAX_LIBRARY)/sc_code.mxo"
-	@echo "installed: $(MAX_LIBRARY)/sc_code.mxo"
+	@[ -d "$(MAX_PKG)" ] || { echo "no package at $(MAX_PKG): run cmake --build build --target install-package first" >&2; exit 1; }
+	@mkdir -p "$(MAX_EXTERNALS)"
+	rm -rf "$(MAX_EXTERNALS)/sc_code.mxo"
+	cp -R $(B)/sc_code.mxo "$(MAX_EXTERNALS)/sc_code.mxo"
+	codesign --verify --deep --strict "$(MAX_EXTERNALS)/sc_code.mxo"
+	@echo "installed: $(MAX_EXTERNALS)/sc_code.mxo"
 
-# Help: Max looks it up by name in the search path (alt-click on the object).
-# That folder is `help` inside a search path, i.e. ~/Documents/Max 9/Library/help;
-# ~/Documents/Max 9/Help is NOT in the search path (see README, install step 2).
-MAX_HELP ?= $(MAX_LIBRARY)/help
+# Help: Max looks it up by name in the search path (alt-click on the object). Inside a
+# package that folder is `<package>/help`; ~/Documents/Max 9/Help is NOT in the search
+# path. Both objects keep their help next to each other so the two patches stay wired.
+MAX_HELP ?= $(MAX_PKG)/help
 
 install-help:
 	@mkdir -p "$(MAX_HELP)"
@@ -207,7 +213,7 @@ install-help:
 	fi
 
 uninstall:
-	rm -rf "$(MAX_LIBRARY)/sc_code.mxo" "$(MAX_HELP)/sc_code.maxhelp"
+	rm -rf "$(MAX_EXTERNALS)/sc_code.mxo" "$(MAX_HELP)/sc_code.maxhelp"
 
 # --- two versions side by side: 0.8.1 (WITHOUT autocomplete) vs the current one ---
 # Max only loads ONE `sc_code.mxo` per Library, so "having two versions" means
@@ -286,7 +292,7 @@ install-spike: $(B)/keylog.mxo
 	rm -rf "$(MAX_LIBRARY)/keylog.mxo"
 	cp -R $(B)/keylog.mxo "$(MAX_LIBRARY)/keylog.mxo"
 	codesign --verify --deep --strict "$(MAX_LIBRARY)/keylog.mxo"
-	@echo "instalado: $(MAX_LIBRARY)/keylog.mxo"
+	@echo "installed: $(MAX_LIBRARY)/keylog.mxo"
 
 uninstall-spike:
 	rm -rf "$(MAX_LIBRARY)/keylog.mxo"

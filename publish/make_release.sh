@@ -27,9 +27,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$HERE")"
 cd "$ROOT"
 
-VER="${1:-$(sed -n 's/.*SC3_VERSION:-\([0-9.]*\)}.*/\1/p' external/build.sh | head -1)}"
+VER="${1:-$(sed -n 's/^#define SC3_TILDE_VERSION "\(.*\)"/\1/p' external/sc3_tilde.cpp)}"
 SC_CODE_VER="$(sed -n 's/^SC_CODE_VER := //p' external/sc_code/Makefile | head -1)"
-[[ -n "$VER" ]] || { echo "ERROR: could not read SC3_VERSION from external/build.sh" >&2; exit 1; }
+[[ -n "$VER" ]] || { echo "ERROR: could not read SC3_TILDE_VERSION from external/sc3_tilde.cpp" >&2; exit 1; }
 
 NAME="sc3-$VER-arm64"
 STAGE="release/$NAME"

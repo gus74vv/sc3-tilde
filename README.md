@@ -266,8 +266,8 @@ once:
 
 * wire the editor's outlet into `sc3~` and send `index` to `sc_code`: sclang dumps every
   class, method and argument name (`index <path>` writes elsewhere, one shot).
-* one file per installation (`~/Documents/Max 9/Library/sc_code-index.txt`) shared by every
-  `sc_code`; `@indexfile <path>` points at a dump kept somewhere else.
+* one file per installation (`sc_code-index.txt`, next to the bundle it was written from)
+  shared by every `sc_code`; `@indexfile <path>` points at a dump kept somewhere else.
 * regenerate it after installing Quarks, editing Extensions or updating SuperCollider:
   methods added at runtime are not in the dump.
 * the editor only **reads** the file (`fopen`, re-parsed when `mtime`/`size` change), so the

@@ -2,8 +2,8 @@
 # sc3-tilde — SuperCollider (sclang + scsynth) in-process inside Max.
 #
 # Two entry points, one source of truth for the SuperCollider flags:
-#   * ./build.sh in external/ installs in ~/Documents/Max 9/Library (dev loop,
-#     no CMake, uses external/sc.mk directly);
+#   * ./build.sh in external/ installs inside the package in
+#     ~/Documents/Max 9/Packages/sc3-tilde (dev loop, no CMake, uses external/sc.mk);
 #   * this file builds the same two bundles and stages the Max package
 #     (build/package/sc3-tilde) and runs the same gates with ctest.
 #
