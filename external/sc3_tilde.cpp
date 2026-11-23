@@ -31,10 +31,12 @@
  * `Out.ar(4, sig)` with
  * `[sc3~ 2 4]`.
  *
- * Assets: the class library and the stock UGens come from the REAL
- * SuperCollider installation (/Applications/SuperCollider.app, same version as
- * the engine); only the Qt-less module ships inside the bundle
- * (`Contents/Resources/SCMaxCompat`).
+ * Assets (issue #1, item 9): the bundle is SELF-CONTAINED — the class
+ * library, the stock UGens, the sounds and libsndfile travel inside it
+ * (`Contents/Resources`, `Contents/Frameworks`, assembled by
+ * scripts/stage_bundle.sh). /Applications/SuperCollider.app is a
+ * BUILD-TIME dependency only. `SC3_APP_PATH` forces the real installation
+ * instead (development: same object, library from the app + version check).
  *
  * Project rules (see the design notes): the sclang VM is never touched from the audio
  * thread; the World is only touched from `perform64` (and from the worker
@@ -374,8 +376,20 @@ static std::string sc3_bundle_resources()
 
 static void sc3_engine_config(t_sc3 *x, Sc3EngineConfig &cfg)
 {
+	/* Issue #1 item 9: default = the payload that travels inside the .mxo.
+	   Precedence: SC3_APP_PATH (development against a real installation,
+	   with the 4.2 version policy) → staged bundle → the installation (a
+	   bundle built without staging, so `info` still tells the truth). */
+	const std::string res = sc3_bundle_resources();
+	const bool staged =
+	    !res.empty() && std::filesystem::exists(res + "/SCClassLibrary");
 	const char *app = std::getenv("SC3_APP_PATH");
-	cfg.scAppPath = app ? app : "/Applications/SuperCollider.app";
+	if (app && *app)
+		cfg.scAppPath = app;
+	else if (staged)
+		cfg.resourcesDir = res;
+	else
+		cfg.scAppPath = "/Applications/SuperCollider.app";
 	/* 4.x: World UDP port. Precedence: `@port N` from the patch → env
 	   SC3_PORT (tests/CLI) → **0 = AUTO** (the kernel picks a free one, so the
 	   SC IDE — which always takes 57110 — and sc3~ coexist). The real port shows
@@ -386,9 +400,10 @@ static void sc3_engine_config(t_sc3 *x, Sc3EngineConfig &cfg)
 		wantPort = port ? std::atoll(port) : 0;
 	}
 	cfg.port = (int)std::max<long>(0, std::min<long>(wantPort, 65535));
-	cfg.compatDir = sc3_bundle_resources();
-	if (!cfg.compatDir.empty())
-		cfg.compatDir += "/SCMaxCompat";
+	/* The Qt-free module is ours, not SC's: it is in the bundle as soon as
+	   the bundle is staged (build.sh / CMake). */
+	if (!res.empty() && std::filesystem::exists(res + "/SCMaxCompat"))
+		cfg.compatDir = res + "/SCMaxCompat";
 	/* 3.2: the World has to be born at the DSP chain's sample rate. With DSP off
 	   `dsp64` has not run yet (x->sr == 0), but Max already has the driver's
 	   sample rate configured: `sys_getsr()` returns it anyway. That way the normal
@@ -397,7 +412,8 @@ static void sc3_engine_config(t_sc3 *x, Sc3EngineConfig &cfg)
 	cfg.preferredSampleRate = hostSr > 0.0 ? hostSr : 0.0;
 	/* 4.2: accept an SC installation with ANOTHER MINOR version (and warn). The
 	   default (0) rejects: the installed class library is compiled by our
-	   interpreter and needs its primitives. */
+	   interpreter and needs its primitives. Only reachable in app mode: with the
+	   bundled payload both sides come from the same source tree. */
 	cfg.allowScVersion = x->allowscversion != 0;
 	cfg.verbose = std::getenv("SC3_DEBUG_OSC") != nullptr;
 }
@@ -425,10 +441,11 @@ static void sc3_report_status(t_sc3 *x)
 	                      ? sys_getdspobjdspstate((t_object *)x)
 	                      : 0;
 	sc3_post(x, "sc3~ v%s engine=%s sr=%.0f blockLen=%ld maxvec=%ld units=%ld "
-	            "degraded=%s sc=%s",
+	            "degraded=%s sc=%s%s",
 	         SC3_TILDE_VERSION, stateName, st.sampleRate, st.bufLength,
 	         x->maxvec, st.numUnits, st.degraded ? "yes" : "no",
-	         st.scVersion.empty() ? "?" : st.scVersion.c_str());
+	         st.scVersion.empty() ? "?" : st.scVersion.c_str(),
+	         st.selfContained ? " (bundled)" : "");
 	/* `queued` does not include the eval IN FLIGHT (the worker pops it
 	   before running) ⇒ `busy` is the one that answers "is sclang answering?". */
 	char busy[48];
@@ -1584,7 +1601,9 @@ extern "C" void C74_EXPORT ext_main(void *r)
 	                                 (method)sc3_port_set, calcoffset(t_sc3, port)));
 
 	/* 4.2: `@allowscversion 1` = accept a SuperCollider installation with
-	   another MINOR version (3.13, 3.15…). Default 0: same minor version only. */
+	   another MINOR version (3.13, 3.15…). Default 0: same minor version only.
+	   It only applies with SC3_APP_PATH (the bundled library is the one the
+	   engine was compiled against: there is nothing to be out of sync with). */
 	class_addattr(c, attr_offset_new("allowscversion", USESYM(long), 0, (method)0L,
 	                                 (method)0L,
 	                                 calcoffset(t_sc3, allowscversion)));

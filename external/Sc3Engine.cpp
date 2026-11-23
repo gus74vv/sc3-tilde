@@ -1042,6 +1042,13 @@ struct Sc3Engine::Impl {
 				std::fprintf(stderr, "[info] userConfigDir = %s\n", cfg.userConfigDir.c_str());
 		}
 		const std::string app = cfg.scAppPath.empty() ? "/Applications/SuperCollider.app" : cfg.scAppPath;
+		// Issue #1 item 9: with a bundled payload nothing outside the .mxo is
+		// read. resDir is the single source for the class library, the stock
+		// UGens and Platform.resourceDir (sounds, HID tables).
+		const bool bundled = !cfg.resourcesDir.empty();
+		const std::string resDir =
+		    bundled ? cfg.resourcesDir : app + "/Contents/Resources";
+		st.selfContained = bundled;
 		// 4.2 (b): escape hatch for an installation of a DIFFERENT minor version.
 		// Precedence: config (`@allowscversion`) → environment (tests/CLI).
 		bool allowVer = cfg.allowScVersion;
@@ -1051,20 +1058,26 @@ struct Sc3Engine::Impl {
 		}
 		std::string clDir = cfg.classLibraryDir;
 		if (!langBooted && clDir.empty()) {
-			clDir = app + "/Contents/Resources";
+			clDir = resDir;
 			if (!fs::exists(fs::path(clDir) / "SCClassLibrary")) {
-				st.error = "cannot find the SuperCollider class library at " + clDir +
-				           " (install SuperCollider " + SC_VersionString() +
-				           " in /Applications or pass scAppPath/classLibraryDir)";
+				st.error = bundled
+				               ? "the bundle carries no class library at " + clDir +
+				                     " (rebuild it: external/scripts/stage_bundle.sh)"
+				               : "cannot find the SuperCollider class library at " + clDir +
+				                     " (install SuperCollider " + SC_VersionString() +
+				                     " in /Applications, pass scAppPath/classLibraryDir, or use "
+				                     "a self-contained bundle)";
 				return false;
 			}
 			// 4.2 (a): the version policy is NOT string equality. Same
 			// major.minor is accepted with a warning; another minor needs
-			// `allowscversion`.
+			// `allowscversion`. With the bundled library there is nothing to
+			// compare: it is the one the engine was compiled against (it is
+			// copied by scripts/stage_bundle.sh).
 			const std::string engineVer = SC_VersionString();
-			const std::string ver = installedScVersion(app);
+			const std::string ver = bundled ? engineVer : installedScVersion(app);
 			st.scVersion = ver;
-			if (!ver.empty() && ver != engineVer) {
+			if (!bundled && !ver.empty() && ver != engineVer) {
 				int imaj = 0, imin = 0, emaj = 0, emin = 0;
 				const bool sameMinor = versionMajorMinor(ver, &imaj, &imin) &&
 				                       versionMajorMinor(engineVer, &emaj, &emin) &&
@@ -1091,7 +1104,7 @@ struct Sc3Engine::Impl {
 				              "interpreter does not have";
 			}
 		} else if (!langBooted) {
-			st.scVersion = installedScVersion(app);
+			st.scVersion = bundled ? SC_VersionString() : installedScVersion(app);
 			// 3.4: with an explicit classLibraryDir (fixture, bundle) it has
 			// to be validated here: otherwise sclang fails with "the library has not
 			// been compiled successfully" and it is not obvious that the path is the
@@ -1108,7 +1121,7 @@ struct Sc3Engine::Impl {
 		}
 
 		// 2b. the Qt-less module as an extra include dir of the class library (10 KB
-		//     of .sc: the library is not bundled, only the initClassTree override
+		//     of .sc: the initClassTree override
 		//     + the GUI/Server stubs). Added BEFORE compiling; compileLibrary only
 		//     reads the config if gLanguageConfig is nullptr.
 		if (!cfg.compatDir.empty()) {
@@ -1230,7 +1243,7 @@ struct Sc3Engine::Impl {
 
 		std::string ugens = cfg.ugenPluginsPath;
 		if (ugens.empty()) {
-			ugens = app + "/Contents/Resources/plugins";
+			ugens = resDir + "/plugins";
 			if (!fs::is_directory(ugens))
 				ugens = ""; // no stock: only the user dir
 			const std::string user = userPluginsDir();
@@ -1575,12 +1588,13 @@ void Sc3Engine::teardown()
 		std::lock_guard<std::mutex> lk(s.outMtx);
 		const std::string cl = s.st.classLibraryDir, ver = s.st.scVersion,
 		                  degrade = s.st.degradeReport;
-		const bool degraded = s.st.degraded;
+		const bool degraded = s.st.degraded, selfContained = s.st.selfContained;
 		s.st = Sc3EngineStatus {};
 		s.st.classLibraryDir = cl;
 		s.st.scVersion = ver;
 		s.st.degradeReport = degrade;
 		s.st.degraded = degraded;
+		s.st.selfContained = selfContained;
 	}
 	s.state.store(kBootIdle); // permite volver a hacer open()
 }

@@ -42,8 +42,15 @@ struct Sc3EngineConfig {
 	// version must be the same **minor** version (3.14.x) as the compiled sclang
 	// (3.14.1): a patch change is accepted (4.2), a different minor is not.
 	std::string scAppPath;       // default: /Applications/SuperCollider.app
-	std::string classLibraryDir; // default: <scAppPath>/Contents/Resources
-	std::string ugenPluginsPath; // default: <scAppPath>/Contents/Resources/plugins
+	// SELF-CONTAINED (issue #1, item 9): <bundle>/Contents/Resources, where
+	// scripts/stage_bundle.sh left the class library, the stock .scx, the sounds
+	// and the HID tables. When it is set, that IS the installation: scAppPath is
+	// not consulted and the 4.2 version policy does not apply (there is nothing
+	// to be out of sync with). Empty = the real installation (the headless tests
+	// run in that mode, so both paths stay covered).
+	std::string resourcesDir;
+	std::string classLibraryDir; // default: <resourcesDir> (else <scAppPath>/Contents/Resources)
+	std::string ugenPluginsPath; // default: <resourcesDir>/plugins
 	                             //          + ~/Library/Application Support/SuperCollider/Extensions
 
 	// Qt-free module (SCMaxCompat): added as an include dir of the class library.
@@ -109,6 +116,7 @@ struct Sc3EngineStatus {
 	long numUnits = 0;
 
 	std::string scVersion;       // version of the SC installation in use
+	bool selfContained = false;  // the library/UGens come from inside the .mxo
 	// 4.2 (a): warning when the installation is NOT exactly the engine version
 	// (different patch, or a different minor forced with allowScVersion). Empty = match.
 	std::string versionNote;
