@@ -31,7 +31,7 @@ add_custom_target(package
 add_custom_target(install-package
   COMMAND "${CMAKE_COMMAND}"
           -DSTAGE=${SC3_PKG_STAGE}
-          -DDEST=$ENV{HOME}/Documents/Max 9/Packages/${SC3_PKG_NAME}
+          -DPKG_NAME=${SC3_PKG_NAME}
           -P ${CMAKE_SOURCE_DIR}/cmake/install_package.cmake
   DEPENDS package
   COMMENT "installing the staged package in ~/Documents/Max 9/Packages"
