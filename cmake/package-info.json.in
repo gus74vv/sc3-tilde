@@ -1,0 +1,21 @@
+{
+	"name" : "sc3-tilde",
+	"author" : "gus74vv",
+	"description" : "SuperCollider (sclang + scsynth) running in-process inside Max, with an in-patch sclang code editor",
+	"homepatcher" : "",
+	"max_version_min" : "9.0",
+	"max_version_max" : "none",
+	"os" : {
+		"macintosh" : {
+			"platform" : [ "aarch64" ],
+			"min_version" : "11.0.x"
+		}
+	},
+	"package_extra" : {
+		"reverse_domain" : "org.scmax",
+		"copyright" : "GPL-3.0-only"
+	},
+	"tags" : [ "supercollider", "audio", "synthesis", "live-coding" ],
+	"version" : "@SC3_TILDE_VERSION@",
+	"website" : "https://github.com/gus74vv/sc3-tilde"
+}

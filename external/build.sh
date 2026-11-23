@@ -107,7 +107,6 @@ check_deps() {
     exit 1
   fi
 }
-check_deps "sc3~" "$BUNDLE/Contents/MacOS/sc3~"
 check_deps "libsndfile" "$BUNDLE/Contents/Frameworks/libsndfile.1.dylib"
 echo "   deps: macOS + Max + @loader_path only, OK"
 echo "   libsndfile: $(otool -D "$BUNDLE/Contents/Frameworks/libsndfile.1.dylib" | tail -1)"
@@ -129,3 +128,7 @@ codesign --force --deep --sign - "$BUNDLE" 2>/dev/null || \
   echo "   WARNING: codesign failed (CLT without codesign?) — Max may reject the bundle"
 
 codesign --verify --strict "$BUNDLE" && echo "   firma: ad-hoc OK"
+
+# Same checker the CMake/ctest path runs (arch, minos, signature, deps): the two
+# recipes have to produce the same bundle.
+"$HERE/check_bundle.sh" "$BUNDLE" "$ARCH" "$MINOS"

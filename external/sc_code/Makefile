@@ -32,6 +32,13 @@ CORE_HDR := sc_lexer.h sc_region.h sc_buffer.h sc_indent.h sc_scroll.h sc_highli
 UI_SRC := sc_code.cpp sc_clipboard.mm sc_filedialog.mm
 UI_HDR := sc_code.cpp sc_clipboard.h sc_filedialog.h
 
+# Emits the source lists so CMake builds exactly this editor (see CMakeLists.txt):
+# one place decides which sc_*.cpp are the core and which are the UI.
+.PHONY: print-flags
+print-flags:
+	@printf 'SC_CODE_CORE_SRC=%s\n' '$(CORE_SRC)'
+	@printf 'SC_CODE_UI_SRC=%s\n' '$(UI_SRC)'
+
 .PHONY: all index-real test spike install-spike bundle install install-help smoke testpatch clean uninstall uninstall-spike \
         snapshot install-stable index-real
 
