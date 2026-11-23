@@ -40,6 +40,9 @@ $(SNDFILE):
 	  echo "       SC_APP=<other path> make ..." >&2; exit 1; }
 	@mkdir -p "$(SNDFILE_DIR)"
 	cp "$(SNDFILE_SRC)" $@
+	@if [ "$$(lipo -archs $@)" != "$(SC3_ARCH)" ]; then \
+	  lipo -thin $(SC3_ARCH) $@ -output $@.thin && mv $@.thin $@; \
+	fi
 	install_name_tool -id "$(SNDFILE_ID)" $@
 	@codesign --force --sign - $@ 2>/dev/null || \
 	  echo "WARNING: ad-hoc codesign failed on $@"

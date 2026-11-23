@@ -13,8 +13,14 @@ SDK := /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 # --- libsndfile: NOT taken from Homebrew (Phase 4 § 4.1) -----------------------
 # The only non-Apple dep of `libscsynth.a` (DiskIO) is libsndfile. Instead of
 # /opt/homebrew/lib/libsndfile.dylib the one SC.app ships is used (2.37.0, the
-# same version the engine is compiled with): it is copied to `Frameworks/` and
-# given `install_name @loader_path/../Frameworks/libsndfile.1.dylib`.
+# same version the engine is compiled with): it is copied to `Frameworks/`,
+# thinned to $(SC3_ARCH) and given
+# `install_name @loader_path/../Frameworks/libsndfile.dylib`.
+#
+# The NAME is not free: the stock .scx that travel inside the bundle (issue #1,
+# item 9) ask for `@loader_path/../../Frameworks/libsndfile.dylib` — from
+# Contents/Resources/plugins that is Contents/Frameworks. One copy serves both
+# (the engine and the DiskIO UGen) and the loader resolves it once.
 #
 # Why it works in both layouts without touching anything else:
 #   * bundle:  sc3~.mxo/Contents/MacOS/sc3~   → @loader_path/../Frameworks = Contents/Frameworks ✓
@@ -24,7 +30,7 @@ SDK := /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 # The sanitizer binaries live in build/san/<san>/ (one level below): the
 # Makefile leaves them a link in build/san/Frameworks.
 SC_APP       ?= /Applications/SuperCollider.app
-SNDFILE_NAME := libsndfile.1.dylib
+SNDFILE_NAME := libsndfile.dylib
 SNDFILE_DIR  := $(abspath Frameworks)
 SNDFILE      := $(SNDFILE_DIR)/$(SNDFILE_NAME)
 SNDFILE_SRC  := $(SC_APP)/Contents/Frameworks/libsndfile.dylib

@@ -11,9 +11,9 @@ sc3_fold_frameworks(SC_LIBS SC_LIBS_LINK)
 # libsndfile (the only non-Apple dep of libscsynth) is prepared by the Makefile:
 # the copy from SC.app, install_name rewritten to @loader_path/../Frameworks and
 # re-signed ad-hoc. One implementation, used by the headless tests too.
-set(SC3_SNDFILE "${CMAKE_CURRENT_SOURCE_DIR}/Frameworks/libsndfile.1.dylib")
+set(SC3_SNDFILE "${CMAKE_CURRENT_SOURCE_DIR}/Frameworks/libsndfile.dylib")
 add_custom_target(sc3_sndfile
-  COMMAND "${SC3_MAKE}" -s Frameworks/libsndfile.1.dylib MAX_SDK="${MAX_SDK}"
+  COMMAND "${SC3_MAKE}" -s Frameworks/libsndfile.dylib MAX_SDK="${MAX_SDK}"
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMENT "libsndfile from ${SC_APP}"
   VERBATIM)
@@ -52,13 +52,12 @@ target_link_libraries(sc3_tilde PRIVATE
 add_custom_command(TARGET sc3_tilde POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E rm -rf
           "$<TARGET_BUNDLE_CONTENT_DIR:sc3_tilde>/MacOS/sc3~.dSYM"
-  COMMAND "${CMAKE_COMMAND}" -E make_directory
-          "$<TARGET_BUNDLE_CONTENT_DIR:sc3_tilde>/Frameworks"
-  COMMAND "${CMAKE_COMMAND}" -E copy "${SC3_SNDFILE}"
-          "$<TARGET_BUNDLE_CONTENT_DIR:sc3_tilde>/Frameworks/"
-  COMMAND "${CMAKE_COMMAND}" -E copy_directory
-          "${CMAKE_SOURCE_DIR}/phase1/compat/SCMaxCompat"
-          "$<TARGET_BUNDLE_CONTENT_DIR:sc3_tilde>/Resources/SCMaxCompat"
+  # Payload (class library, stock .scx, sounds, HID tables, SCMaxCompat and
+  # libsndfile) with the SAME script build.sh runs: the two recipes cannot
+  # disagree about what a self-contained bundle carries.
+  COMMAND "${CMAKE_COMMAND}" -E env "SC_APP=${SC_APP}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/scripts/stage_bundle.sh"
+          "$<TARGET_BUNDLE_DIR:sc3_tilde>" "${CMAKE_OSX_ARCHITECTURES}"
   COMMAND sh -c "printf 'iLaXmax2' > '$<TARGET_BUNDLE_CONTENT_DIR:sc3_tilde>/PkgInfo'"
   COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:sc3_tilde>"
   COMMAND codesign --verify --strict "$<TARGET_BUNDLE_DIR:sc3_tilde>"
@@ -97,7 +96,8 @@ add_test(NAME headless.sr-44100
 set_tests_properties(headless.sr-44100 PROPERTIES WORKING_DIRECTORY "${SC3_GATE}")
 
 add_test(NAME bundle.sc3_tilde
-  COMMAND "${SC3_GATE}/check_bundle.sh" "$<TARGET_BUNDLE_DIR:sc3_tilde>")
+  COMMAND "${SC3_GATE}/check_bundle.sh" "$<TARGET_BUNDLE_DIR:sc3_tilde>"
+          "${CMAKE_OSX_ARCHITECTURES}" "${CMAKE_OSX_DEPLOYMENT_TARGET}" --self-contained)
 add_test(NAME symbols.sc3_tilde
   COMMAND python3 "${SC3_GATE}/check_flat_symbols.py"
           "$<TARGET_BUNDLE_DIR:sc3_tilde>/Contents/MacOS/sc3~")

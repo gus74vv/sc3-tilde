@@ -11,10 +11,12 @@
 # always adds is "User Library" (~/Documents/Max 9/Library). `Max 9/externals`
 # is NOT in the search path ⇒ the object shows up as "No such object".
 #
-# The .mxo carries: the Max object + Sc3Engine + the SuperCollider statics
-# (sclang + scsynth) + the Qt-free module (`Contents/Resources/SCMaxCompat`).
-# The class library and the stock .scx are NOT packaged: they come from the real
-# installation (/Applications/SuperCollider.app, same version as the engine).
+# The .mxo is SELF-CONTAINED (issue #1, item 9): the Max object + Sc3Engine +
+# the SuperCollider statics (sclang + scsynth) + the class library, the stock
+# .scx, the sounds, the HID tables and libsndfile (scripts/stage_bundle.sh).
+# /Applications/SuperCollider.app is only needed AT BUILD TIME, to copy its
+# payload; at run time nothing outside the bundle is used. SC3_APP_PATH still
+# forces the real installation (development escape hatch, see sc3_tilde.cpp).
 #
 # Requirements: Xcode CLT, the max-sdk package (max-sdk-base) and a built
 # vendor/supercollider. The binary itself is built by `make build/sc3~` (flags in sc.mk).
@@ -44,24 +46,22 @@ echo "   arch: $ARCH (minos $MINOS)"
 
 # The only non-Apple dep of the engine is libsndfile: it comes from SC.app
 # (`Frameworks/`, see sc.mk) and travels into the bundle as
-# Contents/Frameworks/libsndfile.1.dylib with install_name
-make -s "$HERE/Frameworks/libsndfile.1.dylib" MAX_SDK="$MAXSDK"
+# Contents/Frameworks/libsndfile.dylib (the name the bundled .scx ask for) with
+# install_name @loader_path/../Frameworks/libsndfile.dylib
+make -s "$HERE/Frameworks/libsndfile.dylib" MAX_SDK="$MAXSDK"
 
 make -s build/sc3~ MAX_SDK="$MAXSDK" SC3_ARCH="$ARCH" SC3_MINOS="$MINOS" \
      EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS:-}" EXTRA_LDFLAGS="${EXTRA_LDFLAGS:-}"
 
 rm -rf "$BUNDLE"
-mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources" \
-         "$BUNDLE/Contents/Frameworks"
+mkdir -p "$BUNDLE/Contents/MacOS"
 cp "$BIN" "$BUNDLE/Contents/MacOS/sc3~"
-cp "$HERE/Frameworks/libsndfile.1.dylib" "$BUNDLE/Contents/Frameworks/"
 sed -e "s/@VERSION@/$VER/g" Info.plist.in > "$BUNDLE/Contents/Info.plist"
 printf 'iLaXmax2' > "$BUNDLE/Contents/PkgInfo"
 
-# Qt-free module: ~10 KB of .sc, added as an include dir of the class library of
-# the real installation (the library is not packaged). Without it, a Quark with a
-# GUI initClass aborts the tree and s.boot/s.quit stop being no-ops.
-cp -R ../phase1/compat/SCMaxCompat "$BUNDLE/Contents/Resources/SCMaxCompat"
+# Payload (class library, stock .scx, sounds, HID tables, the SCMaxCompat module
+# and libsndfile). Same script the CMake POST_BUILD runs: one implementation.
+scripts/stage_bundle.sh "$BUNDLE" "$ARCH" "${SC_APP:-/Applications/SuperCollider.app}"
 
 # Help of the object (args, outlets, multi-instance). Max looks for it in the
 # "help" folder of the user search path: ~/Documents/Max 9/Library/help/.
@@ -107,9 +107,22 @@ check_deps() {
     exit 1
   fi
 }
-check_deps "libsndfile" "$BUNDLE/Contents/Frameworks/libsndfile.1.dylib"
+check_deps "libsndfile" "$BUNDLE/Contents/Frameworks/libsndfile.dylib"
+# The bundled .scx keep asking for @loader_path/../../Frameworks/libsndfile.dylib
+# (from Contents/Resources/plugins that is Contents/Frameworks): if the copy is
+# missing or has another name, scsynth loads the plugin and DiskIO dies at dlopen.
+for scx in "$BUNDLE/Contents/Resources/plugins/"*.scx; do
+  while read -r dep; do
+    case "$dep" in
+      @loader_path/*)
+        rel="${dep#@loader_path/}"
+        [[ -e "$BUNDLE/Contents/Resources/plugins/$rel" ]] || {
+          echo "ERROR: $scx needs $dep and it is not in the bundle" >&2; exit 1; } ;;
+    esac
+  done < <(otool -L "$scx" | grep -E '^[[:space:]]' | awk '{print $1}')
+done
 echo "   deps: macOS + Max + @loader_path only, OK"
-echo "   libsndfile: $(otool -D "$BUNDLE/Contents/Frameworks/libsndfile.1.dylib" | tail -1)"
+echo "   libsndfile: $(otool -D "$BUNDLE/Contents/Frameworks/libsndfile.dylib" | tail -1)"
 
 # Gate: flat namespace symbols (see check_flat_symbols.py). The link goes with
 # `-undefined dynamic_lookup` and checks nothing: if the binary references a DATA
@@ -131,4 +144,4 @@ codesign --verify --strict "$BUNDLE" && echo "   firma: ad-hoc OK"
 
 # Same checker the CMake/ctest path runs (arch, minos, signature, deps): the two
 # recipes have to produce the same bundle.
-"$HERE/check_bundle.sh" "$BUNDLE" "$ARCH" "$MINOS"
+"$HERE/check_bundle.sh" "$BUNDLE" "$ARCH" "$MINOS" --self-contained
